@@ -6,7 +6,136 @@ use std::convert::TryFrom;
 #[cfg(test)]
 mod tests {
     #[test]
-    fn man_test() {}
+    fn game_setup_test() {
+        let mut names = Vec::new();
+        names.push("Alice".to_string());
+        let mut test: super::Game = super::Game::new();
+        // Test that game accepts does not accept less than two players
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: false,
+                input_underscoring: false,
+                input_muggins: false,
+                input_overscoring: false,
+            }) == Err("Expected GameSetup with 2 to 5 player names")
+        );
+
+        names.push("Bob".to_string());
+
+        // Test that game does not accept invalid settings eg. muggins being on while manual
+        // scoring is off
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: false,
+                input_underscoring: true,
+                input_muggins: false,
+                input_overscoring: false,
+            }) == Err("Manual scoring must be enabled for underpegging to be enabled")
+        );
+
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: true,
+                input_underscoring: false,
+                input_muggins: true,
+                input_overscoring: false,
+            }) == Err("Manual scoring and underpegging must be enabled for muggins to be enabled")
+        );
+
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: false,
+                input_underscoring: false,
+                input_muggins: true,
+                input_overscoring: false,
+            }) == Err("Manual scoring and underpegging must be enabled for muggins to be enabled")
+        );
+
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: false,
+                input_underscoring: false,
+                input_muggins: false,
+                input_overscoring: true,
+            }) == Err("Manual scoring must be enabled for overpegging to be enabled")
+        );
+
+        // Tests that valid play options succeed
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: false,
+                input_underscoring: false,
+                input_muggins: false,
+                input_overscoring: false,
+            }) == Ok("Received valid GameSetup event")
+        );
+
+        test = super::Game::new();
+        names.push("Carol".to_string());
+
+        assert_eq!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: true,
+                input_underscoring: false,
+                input_muggins: false,
+                input_overscoring: false,
+            }),
+            Ok("Received valid GameSetup event")
+        );
+
+        assert!(test.state == super::GameState::CutInitial);
+
+        test = super::Game::new();
+        names.push("Dan".to_string());
+
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: true,
+                input_underscoring: false,
+                input_muggins: false,
+                input_overscoring: true,
+            }) == Ok("Received valid GameSetup event")
+        );
+
+        assert!(test.state == super::GameState::CutInitial);
+
+        test = super::Game::new();
+        names.push("Erin".to_string());
+
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: true,
+                input_underscoring: true,
+                input_muggins: true,
+                input_overscoring: false,
+            }) == Ok("Received valid GameSetup event")
+        );
+
+        assert!(test.state == super::GameState::CutInitial);
+
+        // Tests that no more than five players are allowed
+        test = super::Game::new();
+        names.push("Frank".to_string());
+
+        assert!(
+            test.process_event(super::GameEvent::GameSetup {
+                input_player_names: names.clone(),
+                input_manual: false,
+                input_underscoring: false,
+                input_muggins: false,
+                input_overscoring: false,
+            }) == Err("Expected GameSetup with 2 to 5 player names")
+        );
+    }
 }
 
 // Object representing a specific player in the game; keeps track of score and the hand
@@ -46,10 +175,10 @@ enum GameEvent {
     // Event containing the parameters to start the game
     GameSetup {
         input_player_names: Vec<String>,
-        input_is_manual: bool,
-        input_is_underscoring: bool,
+        input_manual: bool,
+        input_underscoring: bool,
         input_muggins: bool,
-        input_is_overscoring: bool,
+        input_overscoring: bool,
     },
     // Event containing a set of hand indices for each player in the game; used for selecting the
     // cards to send to the crib
@@ -70,7 +199,7 @@ enum GameEvent {
     Declination,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum GameState {
     // Initializes the Game object based on the settings passed with the GameSetup event
     GameStart,
@@ -179,6 +308,26 @@ struct Game {
 }
 
 impl Game {
+    fn new() -> Game {
+        Game {
+            crib: Vec::new(),
+            deck: deck::new_deck(),
+            index_active: 0,
+            index_dealer: 0,
+            is_manual_scoring: false,
+            is_muggins: false,
+            is_overpegging: false,
+            is_underpegging: false,
+            last_player_index: 0,
+            play_groups: Vec::new(),
+            players: Vec::new(),
+            starter_card: deck::Card {
+                value: deck::CardValue::Ace,
+                suit: deck::CardSuit::Spades,
+            },
+            state: GameState::GameStart,
+        }
+    }
     // Sets up the game object with the parameters given in the GameSetup event; leads to
     // CutInitial
     fn game_setup(
@@ -587,7 +736,7 @@ impl Game {
                 None => {
                     return Err("TODO");
                 }
-                Some(Scores) => {
+                Some(scores) => {
                     return Err("TODO");
                 }
             }
@@ -696,25 +845,25 @@ impl Game {
     }
 
     // Processes the GameEvent objects to progress the model of the game
-    pub fn process_turn(&mut self, event: GameEvent) -> Result<&str, &str> {
+    pub fn process_event(&mut self, event: GameEvent) -> Result<&str, &str> {
         match (self.state, event) {
             // Accepts a GameSetip  event to continue to CutShuffleAndDeal
             (
                 GameState::GameStart,
                 GameEvent::GameSetup {
                     input_player_names,
-                    input_is_manual,
-                    input_is_underscoring,
+                    input_manual,
+                    input_underscoring,
                     input_muggins,
-                    input_is_overscoring,
+                    input_overscoring,
                 },
             ) => Game::game_setup(
                 self,
                 input_player_names,
-                input_is_manual,
-                input_is_underscoring,
+                input_manual,
+                input_underscoring,
                 input_muggins,
-                input_is_overscoring,
+                input_overscoring,
             ),
             (GameState::GameStart, _) => Err("Expected GameSetup event to GameStart"),
 
