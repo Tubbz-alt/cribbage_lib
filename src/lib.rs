@@ -5,6 +5,40 @@ use std::convert::TryFrom;
 
 #[cfg(test)]
 mod tests {
+    // Returns a card object based on a specified value and suit character for the purpose of
+    // testing
+    fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
+        let set_value: super::deck::CardValue = match set_value {
+            'A' => super::deck::CardValue::Ace,
+            '2' => super::deck::CardValue::Two,
+            '3' => super::deck::CardValue::Three,
+            '4' => super::deck::CardValue::Four,
+            '5' => super::deck::CardValue::Five,
+            '6' => super::deck::CardValue::Six,
+            '7' => super::deck::CardValue::Seven,
+            '8' => super::deck::CardValue::Eight,
+            '9' => super::deck::CardValue::Nine,
+            'T' => super::deck::CardValue::Ten,
+            'J' => super::deck::CardValue::Jack,
+            'Q' => super::deck::CardValue::Queen,
+            'K' => super::deck::CardValue::King,
+            _ => panic!("Unexpexted value in return_card()"),
+        };
+
+        let set_suit: super::deck::CardSuit = match set_suit {
+            'H' => super::deck::CardSuit::Hearts,
+            'D' => super::deck::CardSuit::Diamonds,
+            'C' => super::deck::CardSuit::Clubs,
+            'S' => super::deck::CardSuit::Spades,
+            _ => panic!("Unexpected suit in return_card()"),
+        };
+
+        super::deck::Card {
+            value: set_value,
+            suit: set_suit,
+        }
+    }
+
     #[test]
     fn game_setup_test() {
         let mut names = Vec::new();
@@ -135,6 +169,108 @@ mod tests {
                 input_overscoring: false,
             }) == Err("Expected GameSetup with 2 to 5 player names")
         );
+    }
+
+    #[test]
+    fn cut_initial_test() {
+        // Set up test game
+        let mut test = super::Game::new();
+        let mut names = Vec::new();
+        names.push("Alice".to_string());
+        names.push("Bob".to_string());
+        test.process_event(super::GameEvent::GameSetup {
+            input_player_names: names.clone(),
+            input_manual: false,
+            input_underscoring: false,
+            input_muggins: false,
+            input_overscoring: false,
+        });
+        test.is_debug = true;
+
+        // Set the last two cards of the deck to cards of equal value
+        test.deck.reset_deck();
+        test.deck.card_vector[51] = return_card('A', 'S');
+        test.deck.card_vector[50] = return_card('A', 'C');
+        assert_eq!(
+            test.process_event(super::GameEvent::Confirmation),
+            Ok("Cut resulted in tie; redoing"),
+        );
+
+        // Set the last two cards of the deck to cards of different value
+        for player in &mut test.players {
+            player.hand.clear();
+        }
+        test.deck.card_vector[49] = return_card('2', 'S');
+        test.deck.card_vector[48] = return_card('A', 'S');
+        assert_eq!(
+            test.process_event(super::GameEvent::Confirmation),
+            Ok("First dealer chosen with cut")
+        );
+        assert_eq!(test.index_dealer, 1);
+
+        // Add third player, and set last three cards of the deck to equal value
+        names.push("Carol".to_string());
+        test.state = super::GameState::GameStart;
+        test.process_event(super::GameEvent::GameSetup {
+            input_player_names: names,
+            input_manual: false,
+            input_underscoring: false,
+            input_muggins: false,
+            input_overscoring: false,
+        });
+        test.deck.reset_deck();
+        test.deck.card_vector[51] = return_card('A', 'S');
+        test.deck.card_vector[50] = return_card('A', 'C');
+        test.deck.card_vector[49] = return_card('A', 'D');
+
+        assert_eq!(
+            test.process_event(super::GameEvent::Confirmation),
+            Ok("Cut resulted in tie; redoing"),
+        );
+
+        // With third player, set the last cards of the deck to two cards of equal value and one
+        // card of higher value
+        for player in &mut test.players {
+            player.hand.clear();
+        }
+        test.deck.card_vector[48] = return_card('A', 'S');
+        test.deck.card_vector[47] = return_card('A', 'C');
+        test.deck.card_vector[46] = return_card('2', 'S');
+
+        assert_eq!(
+            test.process_event(super::GameEvent::Confirmation),
+            Ok("Cut resulted in tie; redoing"),
+        );
+
+        // With third player, set the last cards of the deck to two cards of equal value and one
+        // card of lower value
+        for player in &mut test.players {
+            player.hand.clear();
+        }
+        test.deck.card_vector[45] = return_card('2', 'S');
+        test.deck.card_vector[44] = return_card('2', 'C');
+        test.deck.card_vector[43] = return_card('A', 'S');
+
+        assert_eq!(
+            test.process_event(super::GameEvent::Confirmation),
+            Ok("First dealer chosen with cut"),
+        );
+        assert_eq!(test.index_dealer, 2);
+
+        // With third player, set the last three cards of the deck to cards of different value
+        for player in &mut test.players {
+            player.hand.clear();
+        }
+        test.state = super::GameState::CutInitial;
+        test.deck.card_vector[42] = return_card('A', 'S');
+        test.deck.card_vector[41] = return_card('2', 'S');
+        test.deck.card_vector[40] = return_card('3', 'S');
+
+        assert_eq!(
+            test.process_event(super::GameEvent::Confirmation),
+            Ok("First dealer chosen with cut"),
+        );
+        assert_eq!(test.index_dealer, 0);
     }
 }
 
@@ -305,6 +441,10 @@ struct Game {
     // The cards played during the play phase; each play group contains between 3 and 13 cards and
     // the maximum number of cards in the play phase total is 20
     play_groups: Vec<PlayGroup>,
+
+    // When active the deck will not reset itself such that one can manually enter values into the
+    // deck
+    is_debug: bool,
 }
 
 impl Game {
@@ -326,6 +466,7 @@ impl Game {
                 suit: deck::CardSuit::Spades,
             },
             state: GameState::GameStart,
+            is_debug: false,
         }
     }
     // Sets up the game object with the parameters given in the GameSetup event; leads to
@@ -393,8 +534,10 @@ impl Game {
     // Processes the cut phase determining the first dealer after confirmation by player left of
     // dealer; leads to Deal
     fn process_cut(&mut self) -> Result<&str, &str> {
-        // Start with shuffled deck
-        self.deck.reset_deck();
+        // Start with shuffled deck; disabled in debug mode for manual editing of deck
+        if !self.is_debug {
+            self.deck.reset_deck();
+        }
 
         // Deal one card to each player
         for player in &mut self.players {
@@ -429,7 +572,7 @@ impl Game {
         // Unwrap should never fail as highest index is three
         self.index_dealer = TryFrom::try_from(player_indices_of_lowest_value[0]).unwrap();
         self.state = GameState::Deal;
-        Ok("First dealer chosen in with cut")
+        Ok("First dealer chosen with cut")
     }
 
     // Deals the cards to each player's hand after confirmation call from the dealer; leads to Sort

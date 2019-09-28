@@ -72,7 +72,8 @@ pub struct Card {
 
 #[derive(Debug, Clone)]
 pub struct Deck {
-    card_vector: Vec<Card>,
+    // card_vector public for debugging purposes, deal cards with reset_deck() and deal()
+    pub card_vector: Vec<Card>,
 }
 
 pub fn new_deck() -> Deck {
