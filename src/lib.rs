@@ -39,6 +39,45 @@ mod tests {
         }
     }
 
+    // Return a basic game with a specified length and debug status
+    fn return_basic_game(len: u8, debug: bool) -> super::Game {
+        let mut names = Vec::new();
+        if len >= 2 {
+            names.push("Alice".to_string());
+            names.push("Bob".to_string());
+        }
+        if len >= 3 {
+            names.push("Carol".to_string());
+        }
+        if len >= 4 {
+            names.push("Dan".to_string());
+        }
+        if len == 5 {
+            names.push("Erin".to_string());
+        }
+
+        let mut game = super::Game::new();
+        if debug {
+            game.is_debug = true;
+        }
+
+        game.process_event(super::GameEvent::GameSetup {
+            input_player_names: names,
+            input_manual: false,
+            input_underscoring: false,
+            input_muggins: false,
+            input_overscoring: false,
+        });
+
+        game
+    }
+
+    fn cut_until_dealer_chosen(game: &mut super::Game) {
+        while game.state == super::GameState::CutInitial {
+            game.process_event(super::GameEvent::Confirmation);
+        }
+    }
+
     #[test]
     fn game_setup_test() {
         let mut names = Vec::new();
@@ -174,18 +213,7 @@ mod tests {
     #[test]
     fn cut_initial_test() {
         // Set up test game
-        let mut test = super::Game::new();
-        let mut names = Vec::new();
-        names.push("Alice".to_string());
-        names.push("Bob".to_string());
-        test.process_event(super::GameEvent::GameSetup {
-            input_player_names: names.clone(),
-            input_manual: false,
-            input_underscoring: false,
-            input_muggins: false,
-            input_overscoring: false,
-        });
-        test.is_debug = true;
+        let mut test = return_basic_game(2, true);
 
         // Set the last two cards of the deck to cards of equal value
         test.deck.reset_deck();
@@ -209,15 +237,7 @@ mod tests {
         assert_eq!(test.index_dealer, 1);
 
         // Add third player, and set last three cards of the deck to equal value
-        names.push("Carol".to_string());
-        test.state = super::GameState::GameStart;
-        test.process_event(super::GameEvent::GameSetup {
-            input_player_names: names,
-            input_manual: false,
-            input_underscoring: false,
-            input_muggins: false,
-            input_overscoring: false,
-        });
+        test = return_basic_game(3, true);
         test.deck.reset_deck();
         test.deck.card_vector[51] = return_card('A', 'S');
         test.deck.card_vector[50] = return_card('A', 'C');
@@ -271,6 +291,49 @@ mod tests {
             Ok("First dealer chosen with cut"),
         );
         assert_eq!(test.index_dealer, 0);
+    }
+
+    #[test]
+    fn deal_test() {
+        // Set up test game
+        let mut test = super::Game::new();
+
+        // Confirm that program deals six cards to each player when there are two players
+        test = return_basic_game(2, false);
+        cut_until_dealer_chosen(&mut test);
+        test.process_event(super::GameEvent::Confirmation);
+        for player in &test.players {
+            assert_eq!(player.hand.len(), 6);
+        }
+
+        // Confirm that program deals five cards to each player when there are three players
+        test = return_basic_game(3, false);
+        cut_until_dealer_chosen(&mut test);
+        test.process_event(super::GameEvent::Confirmation);
+        for player in &test.players {
+            assert_eq!(player.hand.len(), 5);
+        }
+
+        // Confirm that program deals five cards to each player when there are four players
+        test = return_basic_game(4, false);
+        cut_until_dealer_chosen(&mut test);
+        test.process_event(super::GameEvent::Confirmation);
+        for player in &test.players {
+            assert_eq!(player.hand.len(), 5);
+        }
+
+        // Confirm that program deals five cards to every player but the dealer and four card to
+        // the dealer when there are five players
+        test = return_basic_game(5, false);
+        cut_until_dealer_chosen(&mut test);
+        test.process_event(super::GameEvent::Confirmation);
+        for (index, player) in test.players.iter().enumerate() {
+            if index == test.index_dealer as usize {
+                assert_eq!(player.hand.len(), 4);
+            } else {
+                assert_eq!(player.hand.len(), 5);
+            }
+        }
     }
 }
 
@@ -578,7 +641,9 @@ impl Game {
     // Deals the cards to each player's hand after confirmation call from the dealer; leads to Sort
     fn process_deal(&mut self) -> Result<&str, &str> {
         // Starts with shuffled deck
-        self.deck.reset_deck();
+        if !self.is_debug {
+            self.deck.reset_deck();
+        }
 
         // Removes cards from the cut or the previous hand
         for player in &mut self.players {
@@ -589,19 +654,19 @@ impl Game {
         // player is dealt five cards; with five players, five cards are dealt to everyone, but the
         // dealer who gets four
         if self.players.len() == 2 {
-            for _i in 0..5 {
+            for _i in 0..6 {
                 for player in &mut self.players {
                     player.hand.push(self.deck.deal());
                 }
             }
         } else if self.players.len() <= 4 {
-            for _i in 0..4 {
+            for _i in 0..5 {
                 for player in &mut self.players {
                     player.hand.push(self.deck.deal());
                 }
             }
         } else {
-            for i in 0..4 {
+            for i in 0..5 {
                 for (index, player) in &mut self.players.iter_mut().enumerate() {
                     // Excludes the dealer from being dealt a fifth card
                     if i != 4 || self.index_dealer != index as u8 {
