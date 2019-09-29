@@ -1,349 +1,17 @@
-mod deck;
-mod score;
+pub mod deck;
+pub mod score;
+#[cfg(test)]
+mod tests;
 
 use std::convert::TryFrom;
 
-#[cfg(test)]
-mod tests {
-    // Returns a card object based on a specified value and suit character for the purpose of
-    // testing
-    fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
-        let set_value: super::deck::CardValue = match set_value {
-            'A' => super::deck::CardValue::Ace,
-            '2' => super::deck::CardValue::Two,
-            '3' => super::deck::CardValue::Three,
-            '4' => super::deck::CardValue::Four,
-            '5' => super::deck::CardValue::Five,
-            '6' => super::deck::CardValue::Six,
-            '7' => super::deck::CardValue::Seven,
-            '8' => super::deck::CardValue::Eight,
-            '9' => super::deck::CardValue::Nine,
-            'T' => super::deck::CardValue::Ten,
-            'J' => super::deck::CardValue::Jack,
-            'Q' => super::deck::CardValue::Queen,
-            'K' => super::deck::CardValue::King,
-            _ => panic!("Unexpexted value in return_card()"),
-        };
-
-        let set_suit: super::deck::CardSuit = match set_suit {
-            'H' => super::deck::CardSuit::Hearts,
-            'D' => super::deck::CardSuit::Diamonds,
-            'C' => super::deck::CardSuit::Clubs,
-            'S' => super::deck::CardSuit::Spades,
-            _ => panic!("Unexpected suit in return_card()"),
-        };
-
-        super::deck::Card {
-            value: set_value,
-            suit: set_suit,
-        }
-    }
-
-    // Return a basic game with a specified length and debug status
-    fn return_basic_game(len: u8, debug: bool) -> super::Game {
-        let mut names = Vec::new();
-        if len >= 2 {
-            names.push("Alice".to_string());
-            names.push("Bob".to_string());
-        }
-        if len >= 3 {
-            names.push("Carol".to_string());
-        }
-        if len >= 4 {
-            names.push("Dan".to_string());
-        }
-        if len == 5 {
-            names.push("Erin".to_string());
-        }
-
-        let mut game = super::Game::new();
-        if debug {
-            game.is_debug = true;
-        }
-
-        game.process_event(super::GameEvent::GameSetup {
-            input_player_names: names,
-            input_manual: false,
-            input_underscoring: false,
-            input_muggins: false,
-            input_overscoring: false,
-        });
-
-        game
-    }
-
-    fn cut_until_dealer_chosen(game: &mut super::Game) {
-        while game.state == super::GameState::CutInitial {
-            game.process_event(super::GameEvent::Confirmation);
-        }
-    }
-
-    #[test]
-    fn game_setup_test() {
-        let mut names = Vec::new();
-        names.push("Alice".to_string());
-        let mut test: super::Game = super::Game::new();
-        // Test that game accepts does not accept less than two players
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: false,
-                input_underscoring: false,
-                input_muggins: false,
-                input_overscoring: false,
-            }) == Err("Expected GameSetup with 2 to 5 player names")
-        );
-
-        names.push("Bob".to_string());
-
-        // Test that game does not accept invalid settings eg. muggins being on while manual
-        // scoring is off
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: false,
-                input_underscoring: true,
-                input_muggins: false,
-                input_overscoring: false,
-            }) == Err("Manual scoring must be enabled for underpegging to be enabled")
-        );
-
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: true,
-                input_underscoring: false,
-                input_muggins: true,
-                input_overscoring: false,
-            }) == Err("Manual scoring and underpegging must be enabled for muggins to be enabled")
-        );
-
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: false,
-                input_underscoring: false,
-                input_muggins: true,
-                input_overscoring: false,
-            }) == Err("Manual scoring and underpegging must be enabled for muggins to be enabled")
-        );
-
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: false,
-                input_underscoring: false,
-                input_muggins: false,
-                input_overscoring: true,
-            }) == Err("Manual scoring must be enabled for overpegging to be enabled")
-        );
-
-        // Tests that valid play options succeed
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: false,
-                input_underscoring: false,
-                input_muggins: false,
-                input_overscoring: false,
-            }) == Ok("Received valid GameSetup event")
-        );
-
-        test = super::Game::new();
-        names.push("Carol".to_string());
-
-        assert_eq!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: true,
-                input_underscoring: false,
-                input_muggins: false,
-                input_overscoring: false,
-            }),
-            Ok("Received valid GameSetup event")
-        );
-
-        assert!(test.state == super::GameState::CutInitial);
-
-        test = super::Game::new();
-        names.push("Dan".to_string());
-
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: true,
-                input_underscoring: false,
-                input_muggins: false,
-                input_overscoring: true,
-            }) == Ok("Received valid GameSetup event")
-        );
-
-        assert!(test.state == super::GameState::CutInitial);
-
-        test = super::Game::new();
-        names.push("Erin".to_string());
-
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: true,
-                input_underscoring: true,
-                input_muggins: true,
-                input_overscoring: false,
-            }) == Ok("Received valid GameSetup event")
-        );
-
-        assert!(test.state == super::GameState::CutInitial);
-
-        // Tests that no more than five players are allowed
-        test = super::Game::new();
-        names.push("Frank".to_string());
-
-        assert!(
-            test.process_event(super::GameEvent::GameSetup {
-                input_player_names: names.clone(),
-                input_manual: false,
-                input_underscoring: false,
-                input_muggins: false,
-                input_overscoring: false,
-            }) == Err("Expected GameSetup with 2 to 5 player names")
-        );
-    }
-
-    #[test]
-    fn cut_initial_test() {
-        // Set up test game
-        let mut test = return_basic_game(2, true);
-
-        // Set the last two cards of the deck to cards of equal value
-        test.deck.reset_deck();
-        test.deck.card_vector[51] = return_card('A', 'S');
-        test.deck.card_vector[50] = return_card('A', 'C');
-        assert_eq!(
-            test.process_event(super::GameEvent::Confirmation),
-            Ok("Cut resulted in tie; redoing"),
-        );
-
-        // Set the last two cards of the deck to cards of different value
-        for player in &mut test.players {
-            player.hand.clear();
-        }
-        test.deck.card_vector[49] = return_card('2', 'S');
-        test.deck.card_vector[48] = return_card('A', 'S');
-        assert_eq!(
-            test.process_event(super::GameEvent::Confirmation),
-            Ok("First dealer chosen with cut")
-        );
-        assert_eq!(test.index_dealer, 1);
-
-        // Add third player, and set last three cards of the deck to equal value
-        test = return_basic_game(3, true);
-        test.deck.reset_deck();
-        test.deck.card_vector[51] = return_card('A', 'S');
-        test.deck.card_vector[50] = return_card('A', 'C');
-        test.deck.card_vector[49] = return_card('A', 'D');
-
-        assert_eq!(
-            test.process_event(super::GameEvent::Confirmation),
-            Ok("Cut resulted in tie; redoing"),
-        );
-
-        // With third player, set the last cards of the deck to two cards of equal value and one
-        // card of higher value
-        for player in &mut test.players {
-            player.hand.clear();
-        }
-        test.deck.card_vector[48] = return_card('A', 'S');
-        test.deck.card_vector[47] = return_card('A', 'C');
-        test.deck.card_vector[46] = return_card('2', 'S');
-
-        assert_eq!(
-            test.process_event(super::GameEvent::Confirmation),
-            Ok("Cut resulted in tie; redoing"),
-        );
-
-        // With third player, set the last cards of the deck to two cards of equal value and one
-        // card of lower value
-        for player in &mut test.players {
-            player.hand.clear();
-        }
-        test.deck.card_vector[45] = return_card('2', 'S');
-        test.deck.card_vector[44] = return_card('2', 'C');
-        test.deck.card_vector[43] = return_card('A', 'S');
-
-        assert_eq!(
-            test.process_event(super::GameEvent::Confirmation),
-            Ok("First dealer chosen with cut"),
-        );
-        assert_eq!(test.index_dealer, 2);
-
-        // With third player, set the last three cards of the deck to cards of different value
-        for player in &mut test.players {
-            player.hand.clear();
-        }
-        test.state = super::GameState::CutInitial;
-        test.deck.card_vector[42] = return_card('A', 'S');
-        test.deck.card_vector[41] = return_card('2', 'S');
-        test.deck.card_vector[40] = return_card('3', 'S');
-
-        assert_eq!(
-            test.process_event(super::GameEvent::Confirmation),
-            Ok("First dealer chosen with cut"),
-        );
-        assert_eq!(test.index_dealer, 0);
-    }
-
-    #[test]
-    fn deal_test() {
-        // Set up test game
-        let mut test = super::Game::new();
-
-        // Confirm that program deals six cards to each player when there are two players
-        test = return_basic_game(2, false);
-        cut_until_dealer_chosen(&mut test);
-        test.process_event(super::GameEvent::Confirmation);
-        for player in &test.players {
-            assert_eq!(player.hand.len(), 6);
-        }
-
-        // Confirm that program deals five cards to each player when there are three players
-        test = return_basic_game(3, false);
-        cut_until_dealer_chosen(&mut test);
-        test.process_event(super::GameEvent::Confirmation);
-        for player in &test.players {
-            assert_eq!(player.hand.len(), 5);
-        }
-
-        // Confirm that program deals five cards to each player when there are four players
-        test = return_basic_game(4, false);
-        cut_until_dealer_chosen(&mut test);
-        test.process_event(super::GameEvent::Confirmation);
-        for player in &test.players {
-            assert_eq!(player.hand.len(), 5);
-        }
-
-        // Confirm that program deals five cards to every player but the dealer and four card to
-        // the dealer when there are five players
-        test = return_basic_game(5, false);
-        cut_until_dealer_chosen(&mut test);
-        test.process_event(super::GameEvent::Confirmation);
-        for (index, player) in test.players.iter().enumerate() {
-            if index == test.index_dealer as usize {
-                assert_eq!(player.hand.len(), 4);
-            } else {
-                assert_eq!(player.hand.len(), 5);
-            }
-        }
-    }
-}
-
 // Object representing a specific player in the game; keeps track of score and the hand
 #[derive(Debug, Clone)]
-struct Player {
-    username: String,
-    back_peg_pos: u8,
-    front_peg_pos: u8,
-    hand: Vec<deck::Card>,
+pub struct Player {
+    pub username: String,
+    pub back_peg_pos: u8,
+    pub front_peg_pos: u8,
+    pub hand: Vec<deck::Card>,
 }
 
 impl Player {
@@ -363,14 +31,14 @@ impl Player {
 // Enum for the event sent during the play phase of the game; simply a selection of the card to be
 // played or a Go if no card play is possible
 #[derive(Debug, Clone, Copy)]
-enum PlayTurn {
+pub enum PlayTurn {
     CardSelected(deck::Card),
     Go,
 }
 
 // Enum sent to the process_turn function to advance the play of the game model
 #[derive(Debug, Clone)]
-enum GameEvent {
+pub enum GameEvent {
     // Event containing the parameters to start the game
     GameSetup {
         input_player_names: Vec<String>,
@@ -399,7 +67,7 @@ enum GameEvent {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum GameState {
+pub enum GameState {
     // Initializes the Game object based on the settings passed with the GameSetup event
     GameStart,
     // Performs the initial cut to determine the dealer after receiving a Confirmation event
@@ -434,10 +102,11 @@ enum GameState {
     // Deals with the automatic or manual scoring of the crib with a Confirmation or
     // ManScoreSelection
     CribScore,
-    // Deals with the calling of muggins for the crib witha Muggins event
+    // Deals with the calling of muggins for the crib with a Muggins event
     CribMuggins,
     // State for when a player has won the game; routes back to Deal for the next game of the
     // match or to End
+    // and scores, the crib, the starter card, etc.
     Win,
     // State for the end of play
     End,
@@ -466,7 +135,7 @@ enum GameLog<T> {
 }
 
 // Game object which tracks game variables and processes GameEvents
-struct Game {
+pub struct Game {
     // Game options; given with the player names in the GameSetup event
     is_manual_scoring: bool,
     is_underpegging: bool,
@@ -477,41 +146,41 @@ struct Game {
     // log: Vec<GameLog>,
 
     // The current GameState that the game is in
-    state: GameState,
+    pub state: GameState,
 
     // A vector of two to five Player objects
-    players: Vec<Player>,
+    pub players: Vec<Player>,
 
     // The deck of cards to be used in the game; at most 25 cards are used so the deck should never
-    // run out of cards
-    deck: deck::Deck,
+    // run out of cards; public for debug purposes only
+    pub deck: deck::Deck,
 
     // The player index of the current dealer
-    index_dealer: u8,
+    pub index_dealer: u8,
 
     // The player index of who is currently playing or scoring
-    index_active: u8,
+    pub index_active: u8,
 
     // The player index of who last made a valid move while playing
     last_player_index: u8,
 
     // The card that is cut and shared by all players' hands
-    starter_card: deck::Card,
+    pub starter_card: deck::Card,
 
     // The extra hand given to the dealer after scoring their hand
-    crib: Vec<deck::Card>,
+    pub crib: Vec<deck::Card>,
 
     // The cards played during the play phase; each play group contains between 3 and 13 cards and
     // the maximum number of cards in the play phase total is 20
-    play_groups: Vec<PlayGroup>,
+    pub play_groups: Vec<PlayGroup>,
 
     // When active the deck will not reset itself such that one can manually enter values into the
     // deck
-    is_debug: bool,
+    pub is_debug: bool,
 }
 
 impl Game {
-    fn new() -> Game {
+    pub fn new() -> Game {
         Game {
             crib: Vec::new(),
             deck: deck::new_deck(),
@@ -694,7 +363,13 @@ impl Game {
     // Places the cards in the selected discards into the crib; leads to CutStarter
     // Order of vector of discards match the order of the players vector
     fn process_discard(&mut self, player_discards: Vec<Vec<deck::Card>>) -> Result<&str, &str> {
+        // Resets the crib vector to prevent extra cards
+        self.crib.clear();
+
         // For every player's hand
+        if player_discards.len() != self.players.len() {
+            return Err("There must be a discard vector for every player");
+        }
         for (player_index, discards) in player_discards.iter().enumerate() {
             // Check that number of discarded cards is correct
             if self.players.len() == 2 {
@@ -730,10 +405,11 @@ impl Game {
             for card in discards {
                 self.crib.push(*card);
             }
-            // Adds a card from the deck when the number of players is three
-            if self.players.len() == 3 {
-                self.crib.push(self.deck.deal());
-            }
+        }
+
+        // Adds a card from the deck when the number of players is three
+        if self.players.len() == 3 {
+            self.crib.push(self.deck.deal());
         }
 
         self.state = GameState::CutStarter;
