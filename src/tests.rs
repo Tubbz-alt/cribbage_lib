@@ -512,3 +512,55 @@ fn starter_card_test() {
     );
     assert_eq!(test.state, super::GameState::NibsCheck);
 }
+
+#[test]
+fn check_nibs_test() {
+    // Nibs not called
+    let mut test = return_basic_game(2, false);
+    test.state = super::GameState::NibsCheck;
+    test.starter_card = return_card('A', 'S');
+    assert_eq!(
+        test.process_event(super::GameEvent::Nibs(None)),
+        Ok("Nibs not called"),
+    );
+    assert_eq!(test.state, super::GameState::PlayWaitForCard);
+
+    // Nibs called with Jack
+    // Logic for checking if the score is past 120 should work as in the previous test with
+    // automatic scoring
+    test.state = super::GameState::NibsCheck;
+    test.starter_card = return_card('J', 'S');
+    assert_eq!(
+        test.process_event(super::GameEvent::Nibs(Some(super::score::ScoreEvent {
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Nibs),
+            player_index: test.index_dealer as usize,
+            point_value: 2,
+        }))),
+        Ok("Nibs call"),
+    );
+    assert_eq!(test.players[0].front_peg_pos, 2);
+
+    // Nibs called without Jack
+    // TODO With overscoring penalty
+    test.state = super::GameState::NibsCheck;
+    test.starter_card = return_card('A', 'S');
+    assert_eq!(
+        test.process_event(super::GameEvent::Nibs(Some(super::score::ScoreEvent {
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Nibs),
+            player_index: test.index_dealer as usize,
+            point_value: 2,
+        }))),
+        Err("Invalid nibs call"),
+    );
+
+    // Invalid ScoreEvent
+    test.state = super::GameState::NibsCheck;
+    assert_eq!(
+        test.process_event(super::GameEvent::Nibs(Some(super::score::ScoreEvent {
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Pair),
+            player_index: 0,
+            point_value: 2,
+        }))),
+        Err("Invalid ScoreEvent at NibsCheck")
+    );
+}
