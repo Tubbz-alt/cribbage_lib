@@ -426,8 +426,10 @@ impl Game {
     // Waits for confirmation to cut the starter card from the deck; leads to NibsCheck or
     // PlayWaitForCard/Win depending on whether or not is_manual_scoring is true
     fn process_starter(&mut self) -> Result<&str, &str> {
-        // Actually sets the starter car
-        self.starter_card = self.deck.deal();
+        // Actually sets the starter card when debug is disabled
+        if !self.is_debug {
+            self.starter_card = self.deck.deal();
+        }
 
         // Checks for nibs when manual scoring or underpegging is disabled
         if !self.is_manual_scoring || !self.is_underpegging {

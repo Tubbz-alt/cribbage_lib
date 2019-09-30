@@ -464,3 +464,51 @@ fn discards_test() {
         assert_eq!(player.hand.len(), 4);
     }
 }
+
+#[test]
+fn starter_card_test() {
+    // For when manual scoring or underpegging are disabled
+    let mut test = return_basic_game(2, true);
+    // Jack with score of 119 or higher
+    test.state = super::GameState::CutStarter;
+    test.players[0].change_score(119);
+    test.starter_card = return_card('J', 'S');
+    assert_eq!(
+        test.process_event(super::GameEvent::Confirmation),
+        Ok("Starter card cut; nibs and win"),
+    );
+    assert_eq!(test.state, super::GameState::Win);
+
+    // Jack with score less than 119
+    test = return_basic_game(2, true);
+    test.state = super::GameState::CutStarter;
+    test.starter_card = return_card('J', 'S');
+    assert_eq!(
+        test.process_event(super::GameEvent::Confirmation),
+        Ok("Starter card cut; nib")
+    );
+    assert_eq!(test.players[0].front_peg_pos, 2);
+    assert_eq!(test.state, super::GameState::PlayWaitForCard);
+
+    // No jack
+    test = return_basic_game(2, true);
+    test.state = super::GameState::CutStarter;
+    test.starter_card = return_card('A', 'S');
+    assert_eq!(
+        test.process_event(super::GameEvent::Confirmation),
+        Ok("Starter card cut; no nibs"),
+    );
+    assert_eq!(test.state, super::GameState::PlayWaitForCard);
+
+    // With manual scoring and underpegging enabled
+    test = return_basic_game(2, false);
+    test.state = super::GameState::CutStarter;
+    test.is_manual_scoring = true;
+    test.is_underpegging = true;
+    test.deck.reset_deck();
+    assert_eq!(
+        test.process_event(super::GameEvent::Confirmation),
+        Ok("Starter card cut"),
+    );
+    assert_eq!(test.state, super::GameState::NibsCheck);
+}
