@@ -51,7 +51,7 @@ pub enum ScoreType {
 // Used in logs of the game, manual scoring selection/confirmation, and for automatic scoring
 // Vectors of ScoreEvents are returned by the scoring functions in this file to represent the
 // correct score of each hand or PlayGroup
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ScoreEvent {
     pub score_type: ScoreType,
     pub player_index: usize,
@@ -88,7 +88,8 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
         // Iterates though the indices of the length of the cards vector of the current
         // PlayGroup to 3, the minimum number of cards, and checks for a straight of each
         // length while breaking at the first and largest present
-        for index_offset in (3..current_group.cards.len()).rev() {
+        let length_or_7 = cmp::min(current_group.cards.len(), 7);
+        for index_offset in (3..length_or_7 + 1).rev() {
             // Calculates the start position of the vector slice by subtracting the offset from
             // the length of the PlayGroup
             let start_position: usize = current_group.cards.len() - index_offset;
@@ -99,17 +100,21 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
             // For each card in the last index_offset elements of the PlayGroup's cards vector
             for card in &current_group.cards[start_position..] {
                 // Set the bool located at the position represented by the cards value to true
-                is_value_present[deck::return_play_value(*card) as usize - 1] = true;
+                is_value_present[(deck::return_value(*card) as usize) - 1] = true;
             }
 
             // See if the is_value_present array has a continuous section of index_offset true
             // values
             let mut num_continuous_values: u8 = 0;
+            let mut max_num_continuous_values: u8 = 0;
             for element in &is_value_present {
                 // Add one to the number of continuous values for each true element and reset
                 // for every false value
                 if *element {
                     num_continuous_values += 1;
+                    if num_continuous_values > max_num_continuous_values {
+                        max_num_continuous_values = num_continuous_values;
+                    }
                 } else {
                     num_continuous_values = 0;
                 }
@@ -118,10 +123,10 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
             // If the number of continuous values is the number of values searched then a run
             // of index_offset cards is present in play; add that run value to the
             // score_of_play vector and break from the loop to not double-count runs
-            if num_continuous_values as usize == index_offset {
+            if max_num_continuous_values as usize == index_offset {
                 score_of_play.push(ScoreEvent {
-                    score_type: ScoreType::Play(PlayScoreType::Straight(num_continuous_values)),
-                    point_value: num_continuous_values,
+                    score_type: ScoreType::Play(PlayScoreType::Straight(max_num_continuous_values)),
+                    point_value: max_num_continuous_values,
                     player_index: index,
                 });
                 break;
@@ -129,11 +134,13 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
         }
     }
 
+    if current_group.cards.len() >= 2 {}
+
     // Couple, triple, quadruple check; 2, 6, and 12pts respectivelu
-    // Only cbegins checking when the PlayGroup has two cards
+    // Only begins checking when the PlayGroup has two cards
     if current_group.cards.len() >= 2 {
         let num_cards_or_4 = cmp::min(4, current_group.cards.len());
-        for index_offset in (2..num_cards_or_4).rev() {
+        for index_offset in (2..num_cards_or_4 + 1).rev() {
             // Value of the last played card and whether or not the same value is found in the
             // other elements in question
             let value_last_card = current_group.cards.last().unwrap().value;
@@ -159,17 +166,35 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
                             player_index: index,
                         });
                     } else if index_offset == 3 {
-                        score_of_play.push(ScoreEvent {
-                            score_type: ScoreType::Play(PlayScoreType::Triple),
-                            point_value: 6,
-                            player_index: index,
-                        });
+                        let mut is_quadruple = false;
+                        for score in &score_of_play {
+                            if score.score_type == ScoreType::Play(PlayScoreType::Quadruple) {
+                                is_quadruple = true;
+                            }
+                        }
+                        if !is_quadruple {
+                            score_of_play.push(ScoreEvent {
+                                score_type: ScoreType::Play(PlayScoreType::Triple),
+                                point_value: 6,
+                                player_index: index,
+                            });
+                        }
                     } else if index_offset == 2 {
-                        score_of_play.push(ScoreEvent {
-                            score_type: ScoreType::Play(PlayScoreType::Pair),
-                            point_value: 2,
-                            player_index: index,
-                        });
+                        let mut is_triple_or_quadruple = false;
+                        for score in &score_of_play {
+                            if score.score_type == ScoreType::Play(PlayScoreType::Quadruple)
+                                || score.score_type == ScoreType::Play(PlayScoreType::Triple)
+                            {
+                                is_triple_or_quadruple = true;
+                            }
+                        }
+                        if !is_triple_or_quadruple {
+                            score_of_play.push(ScoreEvent {
+                                score_type: ScoreType::Play(PlayScoreType::Pair),
+                                point_value: 2,
+                                player_index: index,
+                            });
+                        }
                     }
 
                     //Break such as to not double-count the PlayGroup

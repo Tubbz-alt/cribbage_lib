@@ -505,7 +505,17 @@ impl Game {
     fn play_card(&mut self, choice: PlayTurn) -> Result<&str, &str> {
         match choice {
             PlayTurn::Go => {
-                // If the active player is the last player to have played a card; when all players
+                // Checks to see if the player could have played a card instead of going
+                for card in self.players[self.index_active as usize].hand.clone() {
+                    if !Game::has_card_been_played(self, card)
+                        && deck::return_play_value(card) + self.play_groups.last().unwrap().total
+                            <= 31
+                    {
+                        return Err("Player must play card if possible; go invalid");
+                    }
+                }
+
+                // If the active player is the last player to have played a card or when all players
                 // have gone
                 if self.index_active == self.last_player_index {
                     // Point for the last card
@@ -522,16 +532,6 @@ impl Game {
                     else {
                         self.state = GameState::ResetPlay;
                         return Ok("Player takes last point");
-                    }
-                }
-
-                // Checks to see if the player could have played a card instead of going
-                for card in self.players[self.index_active as usize].hand.clone() {
-                    if !Game::has_card_been_played(self, card)
-                        && deck::return_play_value(card) + self.play_groups.last().unwrap().total
-                            <= 31
-                    {
-                        return Err("Player must play card if possible; go invalid");
                     }
                 }
 
@@ -553,6 +553,17 @@ impl Game {
                     > 31
                 {
                     return Err("Last card selected brings total over 31");
+                }
+
+                // Checks that the card being played is actually in the player's hand
+                let mut is_card_in_hand = false;
+                for card in &self.players[self.index_active as usize].hand {
+                    if *card == current_play {
+                        is_card_in_hand = true;
+                    }
+                }
+                if !is_card_in_hand {
+                    return Err("Card played must be in the active player's hand");
                 }
 
                 // Set the last player to place a valid card to the player who has just played
@@ -646,7 +657,7 @@ impl Game {
         }
 
         // Return to play
-        self.index_active = (self.index_active + 1) % 4;
+        self.index_active = (self.index_active + 1) % self.players.len() as u8;
         self.state = GameState::PlayWaitForCard;
         if reset_game {
             self.state = GameState::ResetPlay;

@@ -1,3 +1,5 @@
+use std::char;
+
 // Returns a card object based on a specified value and suit character for the purpose of
 // testing
 fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
@@ -75,6 +77,38 @@ fn cut_deal_and_sort(game: &mut super::Game) {
     cut_until_dealer_chosen(game);
     game.process_event(super::GameEvent::Confirmation);
     game.process_event(super::GameEvent::Confirmation);
+}
+
+// Sets up a game with the given hands, crib, and starter card such as to test playing and/or showing
+fn game_setup(
+    hands_and_crib: Vec<Vec<super::deck::Card>>,
+    starter: super::deck::Card,
+    state: super::GameState,
+) -> super::Game {
+    // Ensures the given state is a valid location to start the simulation from
+    assert!(state == super::GameState::PlayWaitForCard || state == super::GameState::ShowScore);
+    // There will be one hand for every player and a crib in hands_and_crib so the length minus one
+    // is the number of players
+    let mut game = return_basic_game(hands_and_crib.len() as u8 - 1, false);
+
+    // Push the card to the hand or crib
+    for (index, hand) in hands_and_crib.iter().enumerate() {
+        for card in hand {
+            if index != hands_and_crib.len() - 1 {
+                game.players[index].hand.push(*card);
+            } else {
+                game.crib.push(*card);
+            }
+        }
+    }
+
+    game.starter_card = starter;
+
+    game.state = state;
+
+    game.index_active = 1;
+
+    game
 }
 
 #[test]
@@ -298,6 +332,7 @@ fn deal_test() {
     let mut test = super::Game::new();
 
     // Confirm that program deals six cards to each player when there are two players
+    println!("Two");
     test = return_basic_game(2, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -306,6 +341,7 @@ fn deal_test() {
     }
 
     // Confirm that program deals five cards to each player when there are three players
+    println!("Three");
     test = return_basic_game(3, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -314,6 +350,7 @@ fn deal_test() {
     }
 
     // Confirm that program deals five cards to each player when there are four players
+    println!("Four");
     test = return_basic_game(4, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -323,6 +360,7 @@ fn deal_test() {
 
     // Confirm that program deals five cards to every player but the dealer and four card to
     // the dealer when there are five players
+    println!("Five");
     test = return_basic_game(5, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -562,5 +600,252 @@ fn check_nibs_test() {
             point_value: 2,
         }))),
         Err("Invalid ScoreEvent at NibsCheck")
+    );
+}
+
+#[test]
+fn auto_play_score_test() {
+    // Checks for 15
+    let mut test = super::PlayGroup {
+        cards: vec![return_card('T', 'S'), return_card('5', 'S')],
+        total: 15,
+    };
+    assert_eq!(
+        super::score::play_score(0, &test),
+        vec![super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+        }],
+    );
+
+    // Checks for 31
+    test = super::PlayGroup {
+        cards: vec![
+            return_card('T', 'S'),
+            return_card('T', 'C'),
+            return_card('T', 'D'),
+            return_card('A', 'S'),
+        ],
+        total: 31,
+    };
+    assert_eq!(
+        super::score::play_score(0, &test),
+        vec![super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::ThirtyOne),
+        }],
+    );
+
+    // Checks for pairs
+    test = super::PlayGroup {
+        cards: vec![return_card('A', 'S'), return_card('A', 'C')],
+        total: 2,
+    };
+    assert_eq!(
+        super::score::play_score(0, &test),
+        vec![super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Pair),
+        }],
+    );
+
+    // Checks for triples
+    test = super::PlayGroup {
+        cards: vec![
+            return_card('A', 'S'),
+            return_card('A', 'C'),
+            return_card('A', 'D'),
+        ],
+        total: 3,
+    };
+    assert_eq!(
+        super::score::play_score(0, &test),
+        vec![super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 6,
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Triple),
+        }],
+    );
+
+    // Checks for quadruples
+    test = super::PlayGroup {
+        cards: vec![
+            return_card('A', 'S'),
+            return_card('A', 'C'),
+            return_card('A', 'D'),
+            return_card('A', 'H'),
+        ],
+        total: 4,
+    };
+    assert_eq!(
+        super::score::play_score(0, &test),
+        vec![super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 12,
+            score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Quadruple),
+        }],
+    );
+
+    // Checks for runs of lengths three through seven (the maximum)
+    for length in 3..8 {
+        if length == 3 {
+            test = super::PlayGroup {
+                cards: vec![
+                    return_card('A', 'S'),
+                    return_card('2', 'S'),
+                    return_card('3', 'S'),
+                ],
+                total: 6,
+            };
+        } else {
+            test.cards
+                .push(return_card(char::from_digit(length, 10).unwrap(), 'S'));
+            test.total += length as u8;
+        }
+
+        if length != 5 {
+            assert_eq!(
+                super::score::play_score(0, &test),
+                vec![super::score::ScoreEvent {
+                    player_index: 0,
+                    point_value: length as u8,
+                    score_type: super::score::ScoreType::Play(
+                        super::score::PlayScoreType::Straight(length as u8)
+                    ),
+                }],
+            );
+        } else {
+            assert_eq!(
+                super::score::play_score(0, &test),
+                vec![
+                    super::score::ScoreEvent {
+                        player_index: 0,
+                        point_value: 2,
+                        score_type: super::score::ScoreType::Play(
+                            super::score::PlayScoreType::Fifteen
+                        ),
+                    },
+                    super::score::ScoreEvent {
+                        player_index: 0,
+                        point_value: 5,
+                        score_type: super::score::ScoreType::Play(
+                            super::score::PlayScoreType::Straight(5)
+                        ),
+                    }
+                ]
+            );
+        }
+    }
+}
+
+#[test]
+fn play_automatic_test() {
+    // Test game setup
+    let mut hands: Vec<Vec<super::deck::Card>> = Vec::new();
+    hands.push(Vec::new());
+    hands.push(Vec::new());
+    hands.push(Vec::new());
+    hands[1].push(return_card('T', 'S'));
+    hands[0].push(return_card('T', 'C'));
+    hands[1].push(return_card('T', 'D'));
+    hands[0].push(return_card('A', 'S'));
+    hands[1].push(return_card('2', 'S'));
+    hands[0].push(return_card('2', 'C'));
+    hands[1].push(return_card('T', 'H'));
+    let mut test = game_setup(
+        hands.clone(),
+        return_card('A', 'C'),
+        super::GameState::PlayWaitForCard,
+    );
+
+    // Player 0 is dealer when skipping cut so player 1 goes first
+
+    // Valid play
+    println!("Playing first card");
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+            test.players[1].hand[0]
+        ))),
+        Ok("Player places card")
+    );
+    test.process_event(super::GameEvent::Confirmation);
+    assert_eq!(test.players[1].front_peg_pos, 0);
+
+    println!("Playing second card");
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+            test.players[0].hand[0],
+        ))),
+        Ok("Player places card")
+    );
+    test.process_event(super::GameEvent::Confirmation);
+    assert_eq!(test.players[0].front_peg_pos, 2);
+
+    println!("Playing third card");
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+            test.players[1].hand[1],
+        ))),
+        Ok("Player places card"),
+    );
+    test.process_event(super::GameEvent::Confirmation);
+    assert_eq!(test.players[1].front_peg_pos, 6);
+
+    // Invalid go
+    println!("Invalid go");
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::Go)),
+        Err("Player must play card if possible; go invalid")
+    );
+
+    // Valid go
+    println!("Valid go");
+    test.players[0].hand[1] = return_card('2', 'C');
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::Go)),
+        Ok("Player goes")
+    );
+
+    // Valid last card point
+    println!("Valid last card");
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::Go)),
+        Ok("Player takes last point"),
+    );
+    assert_eq!(test.players[1].front_peg_pos, 7);
+
+    // Create next PlayGroup
+    test.process_event(super::GameEvent::Confirmation);
+
+    // Repeated card
+    println!("Repeated card");
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+            test.players[0].hand[0]
+        ))),
+        Err("Last card selected has already been played"),
+    );
+
+    // Total over 31
+    println!("Over 31");
+    test.play_groups[1].total = 30;
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+            test.players[0].hand[2]
+        ))),
+        Err("Last card selected brings total over 31"),
+    );
+
+    // Card not in player's hand
+    println!("Not in hand");
+    test.play_groups[1].total = 0;
+    assert_eq!(
+        test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+            test.players[1].hand[2]
+        ))),
+        Err("Card played must be in the active player's hand"),
     );
 }
