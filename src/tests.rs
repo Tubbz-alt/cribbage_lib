@@ -332,7 +332,6 @@ fn deal_test() {
     let mut test = super::Game::new();
 
     // Confirm that program deals six cards to each player when there are two players
-    println!("Two");
     test = return_basic_game(2, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -341,7 +340,6 @@ fn deal_test() {
     }
 
     // Confirm that program deals five cards to each player when there are three players
-    println!("Three");
     test = return_basic_game(3, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -350,7 +348,6 @@ fn deal_test() {
     }
 
     // Confirm that program deals five cards to each player when there are four players
-    println!("Four");
     test = return_basic_game(4, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -360,7 +357,6 @@ fn deal_test() {
 
     // Confirm that program deals five cards to every player but the dealer and four card to
     // the dealer when there are five players
-    println!("Five");
     test = return_basic_game(5, false);
     cut_until_dealer_chosen(&mut test);
     test.process_event(super::GameEvent::Confirmation);
@@ -754,7 +750,6 @@ fn play_automatic_test() {
     hands[0].push(return_card('A', 'S'));
     hands[1].push(return_card('2', 'S'));
     hands[0].push(return_card('2', 'C'));
-    hands[1].push(return_card('T', 'H'));
     let mut test = game_setup(
         hands.clone(),
         return_card('A', 'C'),
@@ -764,7 +759,6 @@ fn play_automatic_test() {
     // Player 0 is dealer when skipping cut so player 1 goes first
 
     // Valid play
-    println!("Playing first card");
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
             test.players[1].hand[0]
@@ -774,7 +768,6 @@ fn play_automatic_test() {
     test.process_event(super::GameEvent::Confirmation);
     assert_eq!(test.players[1].front_peg_pos, 0);
 
-    println!("Playing second card");
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
             test.players[0].hand[0],
@@ -784,7 +777,6 @@ fn play_automatic_test() {
     test.process_event(super::GameEvent::Confirmation);
     assert_eq!(test.players[0].front_peg_pos, 2);
 
-    println!("Playing third card");
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
             test.players[1].hand[1],
@@ -795,14 +787,12 @@ fn play_automatic_test() {
     assert_eq!(test.players[1].front_peg_pos, 6);
 
     // Invalid go
-    println!("Invalid go");
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::Go)),
         Err("Player must play card if possible; go invalid")
     );
 
     // Valid go
-    println!("Valid go");
     test.players[0].hand[1] = return_card('2', 'C');
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::Go)),
@@ -810,7 +800,6 @@ fn play_automatic_test() {
     );
 
     // Valid last card point
-    println!("Valid last card");
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::Go)),
         Ok("Player takes last point"),
@@ -818,10 +807,12 @@ fn play_automatic_test() {
     assert_eq!(test.players[1].front_peg_pos, 7);
 
     // Create next PlayGroup
-    test.process_event(super::GameEvent::Confirmation);
+    assert_eq!(
+        test.process_event(super::GameEvent::Confirmation),
+        Ok("Ready for next PlayGroup"),
+    );
 
     // Repeated card
-    println!("Repeated card");
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
             test.players[0].hand[0]
@@ -830,7 +821,6 @@ fn play_automatic_test() {
     );
 
     // Total over 31
-    println!("Over 31");
     test.play_groups[1].total = 30;
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
@@ -840,7 +830,6 @@ fn play_automatic_test() {
     );
 
     // Card not in player's hand
-    println!("Not in hand");
     test.play_groups[1].total = 0;
     assert_eq!(
         test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
@@ -848,4 +837,73 @@ fn play_automatic_test() {
         ))),
         Err("Card played must be in the active player's hand"),
     );
+
+    // No cards left test 12 02
+    test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        test.players[0].hand[2],
+    )));
+    test.process_event(super::GameEvent::Confirmation);
+    test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        test.players[1].hand[2],
+    )));
+    test.process_event(super::GameEvent::Confirmation);
+    test.process_event(super::GameEvent::Play(super::PlayTurn::Go));
+    test.process_event(super::GameEvent::Play(super::PlayTurn::Go));
+    assert_eq!(
+        test.process_event(super::GameEvent::Confirmation),
+        Ok("No cards remaining, proceed to scoring"),
+    );
 }
+
+//TODO Fix hand scoring
+/*
+#[test]
+fn show_automatic_test() {
+    let hands: Vec<Vec<super::deck::Card>> = vec![
+        vec![
+            return_card('A', 'S'),
+            return_card('2', 'S'),
+            return_card('3', 'S'),
+            return_card('4', 'S'),
+        ],
+        vec![
+            return_card('4', 'S'),
+            return_card('5', 'S'),
+            return_card('5', 'C'),
+            return_card('6', 'S'),
+        ],
+        vec![
+            return_card('7', 'S'),
+            return_card('7', 'C'),
+            return_card('7', 'D'),
+            return_card('7', 'H'),
+        ],
+    ];
+
+    let mut game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+
+    // Pone scores
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Ok("Show scoring complete"),
+    );
+    assert_eq!(game.players[1].front_peg_pos, 12);
+
+    // Dealer scores main hand
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Ok("Show scoring complete"),
+    );
+    assert_eq!(game.players[0].front_peg_pos, 9);
+
+    // Dealer scores crib
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Ok("Crib scoring complete"),
+    );
+    assert_eq!(game.players[0].front_peg_pos, 29);
+}*/
