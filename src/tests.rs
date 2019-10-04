@@ -856,7 +856,6 @@ fn play_automatic_test() {
 }
 
 //TODO Fix hand scoring
-/*
 #[test]
 fn show_automatic_test() {
     let hands: Vec<Vec<super::deck::Card>> = vec![
@@ -901,9 +900,14 @@ fn show_automatic_test() {
     assert_eq!(game.players[0].front_peg_pos, 9);
 
     // Dealer scores crib
+    println!(
+        "{:?}",
+        super::score::score_hand(0, hands[2].clone(), return_card('8', 'S'))
+    );
+
     assert_eq!(
         game.process_event(super::GameEvent::Confirmation),
         Ok("Crib scoring complete"),
     );
     assert_eq!(game.players[0].front_peg_pos, 29);
-}*/
+}

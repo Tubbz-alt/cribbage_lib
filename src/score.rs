@@ -215,11 +215,18 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
     let mut num_runs_four_or_higher = 0;
     let mut cards_of_runs_four_or_higher: Vec<Vec<deck::Card>> = Vec::new();
 
+    // Variable tracking the card value of any triples or quadruples such as to allow the scoring
+    // system to remove redundant couples and triples
+    let mut value_triple_or_quadruple: Option<deck::CardValue> = None;
+    let mut max_tuple_length = 0;
+
     // Create combinations of the five cards with a binary counter
     let mut combinations: Vec<Vec<deck::Card>> = Vec::new();
-    let mut card_active = [false; 5];
-    while card_active[4] && card_active[3] && card_active[2] && card_active[1] && card_active[0] {
+    let mut card_active = [false; 6];
+    let mut wait_one = false;
+    while !card_active[5] {
         let mut current_combination: Vec<deck::Card> = Vec::new();
+
         if card_active[4] {
             current_combination.push(starter);
         }
@@ -236,8 +243,23 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
             current_combination.push(hand[0]);
         }
 
-        if current_combination.len() > 1 {
+        if current_combination.len() >= 2 {
             combinations.push(current_combination);
+        }
+
+        if !card_active[5]
+            && card_active[4]
+            && card_active[3]
+            && card_active[2]
+            && card_active[1]
+            && card_active[0]
+        {
+            card_active[5] = true;
+            card_active[4] = false;
+            card_active[3] = false;
+            card_active[2] = false;
+            card_active[1] = false;
+            card_active[0] = false;
         }
 
         if !card_active[4] && card_active[3] && card_active[2] && card_active[1] && card_active[0] {
@@ -247,30 +269,41 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
             card_active[1] = false;
             card_active[0] = false;
         }
+
         if !card_active[3] && card_active[2] && card_active[1] && card_active[0] {
             card_active[3] = true;
             card_active[2] = false;
             card_active[1] = false;
             card_active[0] = false;
         }
+
         if !card_active[2] && card_active[1] && card_active[0] {
             card_active[2] = true;
             card_active[1] = false;
             card_active[0] = false;
         }
+
         if !card_active[1] && card_active[0] {
             card_active[1] = true;
             card_active[0] = false;
         }
+
         if !card_active[0] {
-            card_active[0] = true;
+            if !wait_one {
+                card_active[0] = true;
+                wait_one = true;
+            } else {
+                wait_one = false;
+            }
         }
     }
 
     for combination in &combinations {
-        // Flag for whether the combination is a double, triple, or quadruple; if any card does
-        // not match the first card of the combination, then this flag is set to false
+        // Flag for whether the current combination is a tuple; checks for pairs, triples, and
+        // quadruples; flag is set to false when there is a value that does not match the value of
+        // the first card of the combination
         let mut is_tuple = true;
+
         // Array of booleans representing whether a given card value is in the combination; if
         // there is a continuous group the length of the combination (such as not to count a
         // straight several times, then a straight is present
@@ -279,7 +312,11 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
         // Value representing the sum of the given combination such as to check whether or not
         // a combination adds to 15
         let mut sum = 0;
+
         for card in combination {
+            // For every card in the combination, add the value to the sum, determine if the
+            // combination is still a tuple thus far, and if a given value is present in the
+            // combination
             if card.value != combination[0].value {
                 is_tuple = false;
             }
@@ -287,27 +324,57 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
             is_present[deck::return_value(*card) as usize - 1] = true;
         }
 
-        // If all the cards in the combination had equal values
+        // If all the cards in the combination had equal values, push the appropriate ScoreEvent to
+        // found_scores and update the max_tuple_length and value_triple_or_quadruple as
+        // appropriate
         if is_tuple {
             if combination.len() == 2 {
+                if max_tuple_length < 2 {
+                    max_tuple_length = 2;
+                }
                 found_scores.push(ScoreEvent {
                     player_index: index as usize,
                     point_value: 2,
                     score_type: ScoreType::Show(ShowScoreType::Pair(combination.to_vec())),
                 });
+            } else {
+                value_triple_or_quadruple = Some(combination[0].value);
+                if combinations.len() == 3 {
+                    if max_tuple_length < 3 {
+                        max_tuple_length = 3;
+                    }
+                    found_scores.push(ScoreEvent {
+                        player_index: index as usize,
+                        point_value: 6,
+                        score_type: ScoreType::Show(ShowScoreType::Triple(combination.to_vec())),
+                    });
+                } else if combinations.len() == 4 {
+                    if max_tuple_length < 4 {
+                        max_tuple_length = 4;
+                    }
+                    found_scores.push(ScoreEvent {
+                        player_index: index as usize,
+                        point_value: 12,
+                        score_type: ScoreType::Show(ShowScoreType::Quadruple(combination.to_vec())),
+                    });
+                }
             }
         }
-        // If the number of consecutive values equal the number of cards in the
+        // If the maximum number of consecutive values equal the number of cards in the
         // combination
+        let mut max_num_consecutive_values = 0;
         let mut num_consecutive_values = 0;
         for element in &is_present {
             if *element {
                 num_consecutive_values += 1;
+                if num_consecutive_values > max_num_consecutive_values {
+                    max_num_consecutive_values = num_consecutive_values;
+                }
             } else {
                 num_consecutive_values = 0;
             }
         }
-        if num_consecutive_values == combination.len() {
+        if max_num_consecutive_values == combination.len() && combination.len() >= 3 {
             if combination.len() >= 4 {
                 num_runs_four_or_higher += 1;
                 cards_of_runs_four_or_higher.push(combination.to_vec());
@@ -329,93 +396,28 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
         }
     }
 
-    // Combines pairs into triples and quadruples; there's probably a much easier way to do this,
-    // but I don't heckin' know
-
-    // A list of the cards already encountered in the all the pairs in the vector of ScoreEvents
-    let mut cards_encountered: Vec<deck::Card> = Vec::new();
-    // The CardValue of the card which is a part of a triple or quadruple; because the hand is five
-    // cards total there can only be one triple or quadruple in a hand at once
-    let mut matching_card_value: Option<deck::CardValue> = None;
-
-    // Identifies the CardValue of each card in the triple or quadruple
-    for score in &found_scores {
-        // If the ScoreType is a Show(Pair())
-        match &score.score_type {
-            ScoreType::Show(ShowScoreType::Pair(cards)) => {
-                // For every combination for previous pairs and the cards of the current pair
-                for card_current_pair in cards {
-                    for card_previous in &cards_encountered {
-                        // If the current pair's cards match any of the previous pairs' cards
-                        // set the matching_card_value to the value of the current pair element
-                        if *card_current_pair == *card_previous {
-                            matching_card_value = Some(card_current_pair.value);
-                        }
-                    }
-
-                    cards_encountered.push(*card_current_pair);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // For every card in the cards encountered with the specified CardValue, add one to the count
-    // and add a copy to the filtered list of cards
-    let mut num_cards_in_triple_or_quadruple = 0;
-    let mut cards_copies_of_triple_or_quadruple: Vec<deck::Card> = Vec::new();
-    match matching_card_value {
-        Some(value) => {
-            for card in cards_encountered {
-                if card.value == value {
-                    num_cards_in_triple_or_quadruple += 1;
-                    cards_copies_of_triple_or_quadruple.push(card)
-                }
-            }
-        }
-        None => {}
-    };
-
-    // If the num_of_cards_in_triple_or_quadruple is 3 or 4, remove the pairs that make up the
-    // triple or quadruple from found_scores and add the triple or quadruple score event
-    if num_cards_in_triple_or_quadruple == 3 {
-        found_scores.push(ScoreEvent {
-            player_index: index as usize,
-            point_value: 6,
-            score_type: ScoreType::Show(ShowScoreType::Triple(cards_copies_of_triple_or_quadruple)),
-        });
-
-        // Delete all instances of a score of the pair type with a matching card value to the value
-        // of the cards in the triple
+    // Eliminates redundant pairs and triples from the found_scores
+    if max_tuple_length == 4 {
+        // All pairs and triples when there is a quadruple will be redundant
         found_scores.retain({
             |score| match &score.score_type {
-                ScoreType::Show(ShowScoreType::Pair(cards)) => {
-                    let mut is_match = false;
-                    for card in cards {
-                        if card.value == matching_card_value.unwrap() {
-                            is_match = true;
-                        }
-                    }
-
-                    !is_match
-                }
+                ScoreType::Show(ShowScoreType::Pair(cards)) => false,
+                ScoreType::Show(ShowScoreType::Triple(cards)) => false,
                 _ => true,
             }
         });
-    } else if num_cards_in_triple_or_quadruple == 4 {
-        found_scores.push(ScoreEvent {
-            player_index: index as usize,
-            point_value: 12,
-            score_type: ScoreType::Show(ShowScoreType::Quadruple(
-                cards_copies_of_triple_or_quadruple,
-            )),
-        });
-
-        // As a hand has five cards, a hand with a quadruple will not contain any pairs that don't
-        // make up the quadruple
+    } else if max_tuple_length == 3 {
+        // Three out of the four possible pairs will be redundant when there is a triple but no
+        // quadruple
         found_scores.retain({
             |score| match &score.score_type {
-                ScoreType::Show(ShowScoreType::Pair(_)) => false,
+                ScoreType::Show(ShowScoreType::Pair(cards)) => {
+                    if cards[0].value == value_triple_or_quadruple.unwrap() {
+                        false
+                    } else {
+                        true
+                    }
+                }
                 _ => true,
             }
         });
