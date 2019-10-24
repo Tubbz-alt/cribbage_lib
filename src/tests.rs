@@ -855,7 +855,41 @@ fn play_automatic_test() {
     );
 }
 
-//TODO Fix hand scoring
+#[test]
+fn play_manual_test() {
+    // Tests the scoring of cards when manual scoring is enabled
+    // Tests with/without underscoring and with/without muggins
+
+    // Test game setup
+    let hands: Vec<Vec<super::deck::Card>> = vec![
+        vec![
+            return_card('5', 'S'),
+            return_card('A', 'S'),
+            return_card('3', 'S'),
+            return_card('4', 'D'),
+        ],
+        vec![
+            return_card('4', 'S'),
+            return_card('6', 'S'),
+            return_card('2', 'S'),
+            return_card('3', 'C'),
+        ],
+        Vec::new(),
+    ];
+    let mut game = game_setup(
+        hands.clone(),
+        return_card('2', 'C'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+
+    // Test with underscoring disabled
+
+    // Test with underscoring enabled and muggins disabled
+
+    // Test with underscoring and muggins enabled
+}
+
 #[test]
 fn show_automatic_test() {
     let hands: Vec<Vec<super::deck::Card>> = vec![

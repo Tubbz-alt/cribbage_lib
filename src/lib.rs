@@ -153,7 +153,7 @@ pub struct Game {
 
     // The deck of cards to be used in the game; at most 25 cards are used so the deck should never
     // run out of cards; public for debug purposes only
-    pub deck: deck::Deck,
+    deck: deck::Deck,
 
     // The player index of the current dealer
     pub index_dealer: u8,
@@ -171,8 +171,17 @@ pub struct Game {
     pub crib: Vec<deck::Card>,
 
     // The cards played during the play phase; each play group contains between 3 and 13 cards and
-    // the maximum number of cards in the play phase total is 20
+    // the maximum number of cards in the play phase total is 24
     pub play_groups: Vec<PlayGroup>,
+
+    // Vector to hold the ScoreEvents remaining for muggins
+    remaining_score_events: Vec<score::ScoreEvent>,
+
+    // Vector to hold the invalid ScoreEvents when overpegging is enabled
+    overpegged_score_events: Vec<score::ScoreEvent>,
+
+    // Whether to reset the play phase of the game for when a 31 score is present
+    reset_play: bool,
 
     // When active the deck will not reset itself such that one can manually enter values into the
     // deck
@@ -191,8 +200,11 @@ impl Game {
             is_overpegging: false,
             is_underpegging: false,
             last_player_index: 0,
+            overpegged_score_events: Vec::new(),
             play_groups: Vec::new(),
             players: Vec::new(),
+            remaining_score_events: Vec::new(),
+            reset_play: false,
             starter_card: deck::Card {
                 value: deck::CardValue::Ace,
                 suit: deck::CardSuit::Spades,
@@ -621,30 +633,141 @@ impl Game {
     fn play_score(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
         // The list of scores corresponding to the actual maximum value
         // TODO Change play_score arg to u8
-        let correct_scores =
+        self.remaining_score_events =
             score::play_score(self.index_active as usize, self.play_groups.last().unwrap());
         // Flag set when a valid ThirtyOne PlayScoreType is present; indicates that the state
         // should change to ResetPlay instead of PlayWaitForCard
-        let mut reset_game = false;
+        self.reset_play = false;
 
-        // TODO Manual scoring
+        // Manual scoring
+        // TODO: Overpegging
         if self.is_manual_scoring {
             match selection {
+                // If no scores are sent
                 None => {
-                    return Err("TODO");
+                    // If underpegging is enabled, no score will be valid
+                    if self.is_underpegging {
+                        return Ok("Valid no selection for PlayScore");
+                    }
+                    // If underpegging is disabled and a score event is present in
+                    // remaining_score_events, return an error
+                    else if self.remaining_score_events.len() != 0 {
+                        return Err(
+                            "Must enter the correct ScoreEvents when underpegging is disabled",
+                        );
+                    }
+                    // If underpegging is disabled and there are no ScoreEvents in
+                    // remaining_score_events accept the no selection
+                    else {
+                        return Ok("Valid no selection for PlayScore");
+                    }
                 }
+                // If scores are sent
                 Some(scores) => {
-                    return Err("TODO");
+                    // Create a list of every valid and invalid ScoreEvent in the selection
+                    let mut valid_scores: Vec<score::ScoreEvent> = Vec::new();
+                    let mut invalid_scores: Vec<score::ScoreEvent> = Vec::new();
+                    for score in &scores {
+                        let mut is_score_in_correct_scores = false;
+                        for correct_score in &self.remaining_score_events {
+                            if *score == *correct_score {
+                                valid_scores.push(score.clone());
+                                is_score_in_correct_scores = true;
+                                // If there is a valid 31 ScoreEvent, set reset_play to true
+                                if score.score_type
+                                    == score::ScoreType::Play(score::PlayScoreType::ThirtyOne)
+                                {
+                                    self.reset_play = true;
+                                }
+                            }
+                        }
+                        if !is_score_in_correct_scores {
+                            invalid_scores.push(score.clone());
+                            // Set reset_play to true if there's an invalid 31 ScoreEvent when
+                            // overpegging is enabled; can be corrected if another player contests
+                            // the score
+                            if self.is_overpegging
+                                && score.score_type
+                                    == score::ScoreType::Play(score::PlayScoreType::ThirtyOne)
+                            {
+                                self.reset_play = true;
+                            }
+                        }
+                    }
+
+                    // If overpegging is enabled
+                    if self.is_overpegging {
+                        // TODO Implement penalty for overpegging; opponent must catch
+                        return Err("TODO: Overpegging");
+                    } else {
+                        if invalid_scores.len() > 0 {
+                            return Err("Invalid ScoreEvent when overpegging is disable");
+                        }
+                    }
+
+                    // If underpegging is enabled
+                    if self.is_underpegging {
+                        // Remove every score in valid_scores from remaining_score_events then
+                        self.remaining_score_events.retain({
+                            |remaining_score| {
+                                // Do not retain the element if a valid score matching the
+                                // remaining score is found
+                                for valid_score in &valid_scores {
+                                    if *valid_score == *remaining_score {
+                                        return false;
+                                    }
+                                }
+                                // Retain the element if the valid score is not found -- if the
+                                // correct score was not in the selection
+                                true
+                            }
+                        });
+                        // Add points for the valid_scores in the selection
+                        let mut score_sum = 0;
+                        for score in valid_scores {
+                            score_sum += score.point_value;
+
+                            self.players[self.index_active as usize].change_score(score_sum as i8);
+
+                            if self.players[self.index_active as usize].front_peg_pos >= 121 {
+                                self.state = GameState::Win;
+                                return Ok("Play scoring complete and win");
+                            }
+                        }
+                    }
+                    // If underpegging is disabled
+                    else {
+                        // If the number of valid scores equals the number of complete valid
+                        // scores; whether or not all ScoreEvents have been accounted for
+                        if valid_scores.len() == self.remaining_score_events.len() {
+                            self.remaining_score_events.clear();
+                            // Basically do automatic scoring if all the ScoreEvents are
+                            // present
+                            let mut score_sum = 0;
+                            for score in valid_scores {
+                                score_sum += score.point_value;
+                            }
+
+                            self.players[self.index_active as usize].change_score(score_sum as i8);
+
+                            if self.players[self.index_active as usize].front_peg_pos >= 121 {
+                                self.state = GameState::Win;
+                                return Ok("Play scoring complete and win");
+                            }
+                        } else {
+                            return Err("Incomplete score selection when underpegging is disabled");
+                        }
+                    }
                 }
             }
         }
         // Automatic scoring; simply sums the correct amount
         else {
             let mut score_sum = 0;
-            for score in correct_scores {
+            for score in &self.remaining_score_events {
                 score_sum += score.point_value;
                 if score.score_type == score::ScoreType::Play(score::PlayScoreType::ThirtyOne) {
-                    reset_game = true;
+                    self.reset_play = true;
                 }
             }
 
@@ -656,13 +779,81 @@ impl Game {
             }
         }
 
-        // Return to play
-        self.index_active = (self.index_active + 1) % self.players.len() as u8;
-        self.state = GameState::PlayWaitForCard;
-        if reset_game {
-            self.state = GameState::ResetPlay;
+        // Return to play or go to the muggins or PlayOpponentContest state
+        // TODO PlayOpponnentContest when overpegging is enable
+        if self.is_muggins {
+            self.state = GameState::PlayMuggins;
+        } else {
+            self.index_active = (self.index_active + 1) % self.players.len() as u8;
+            if !self.reset_play {
+                self.state = GameState::PlayWaitForCard;
+            } else {
+                self.state = GameState::ResetPlay;
+            }
         }
         Ok("Play scoring complete")
+    }
+
+    fn play_muggins(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
+        match selection {
+            None => {
+                // Prepares to return to the game
+                self.index_active = (self.index_active + 1) % self.players.len() as u8;
+                if !self.reset_play {
+                    self.state = GameState::PlayWaitForCard;
+                } else {
+                    self.state = GameState::ResetPlay;
+                }
+                Ok("No muggins selection")
+            }
+            Some(muggins_selections) => {
+                // Create a list of which muggins selections are valid and which are invalid
+                let mut valid_scores: Vec<score::ScoreEvent> = Vec::new();
+                let mut invalid_scores: Vec<score::ScoreEvent> = Vec::new();
+                for selection_event in &muggins_selections {
+                    let mut is_selection_event_in_remaining = false;
+                    for remaining_event in &self.remaining_score_events {
+                        if *remaining_event == *selection_event {
+                            valid_scores.push(selection_event.clone());
+                            is_selection_event_in_remaining = true;
+                            if remaining_event.score_type
+                                == score::ScoreType::Play(score::PlayScoreType::ThirtyOne)
+                            {
+                                self.reset_play = true;
+                            }
+                        }
+                    }
+                    if !is_selection_event_in_remaining {
+                        invalid_scores.push(selection_event.clone());
+                    }
+                }
+
+                // TODO If overpegging is enabled allow invalid scores
+                if self.is_overpegging {
+                    return Err("TODO");
+                } else {
+                    // Disallow invalid scores when overpegging is disabled
+                    if invalid_scores.len() > 0 {
+                        return Err("Invalid muggins selection");
+                    } else {
+                        // TODO Combine selections by the same player into one score change
+                        for score in valid_scores {
+                            self.players[score.player_index].change_score(score.point_value as i8);
+                        }
+                    }
+                }
+
+                // Prepares the game for the next card to be played or the ResetGame state to
+                // prepare the next play group
+                self.index_active = (self.index_active + 1) % self.players.len() as u8;
+                if !self.reset_play {
+                    self.state = GameState::PlayWaitForCard;
+                } else {
+                    self.state = GameState::ResetPlay;
+                }
+                return Ok("Play muggins complete");
+            }
+        }
     }
 
     // Processes the scoring of a hand in the show phase; leads to Win, ShowMuggins, CribScore, and
@@ -809,8 +1000,10 @@ impl Game {
             }
 
             // Processes any calls of muggins for the play phase of the game
-            (GameState::PlayMuggins, GameEvent::Confirmation) => Err("TODO"),
-            (GameState::PlayMuggins, GameEvent::Muggins(selection)) => Err("TODO"),
+            (GameState::PlayMuggins, GameEvent::Confirmation) => Game::play_muggins(self, None),
+            (GameState::PlayMuggins, GameEvent::Muggins(selection)) => {
+                Game::play_muggins(self, selection)
+            }
             (GameState::PlayMuggins, _) => {
                 Err("Expected Confirmation of Muggins event to PlayMuggins")
             }

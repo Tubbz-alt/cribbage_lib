@@ -208,7 +208,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
 }
 
 // Scores a given hand of five cards
-pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<ScoreEvent> {
+pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> Vec<ScoreEvent> {
     let mut found_scores: Vec<ScoreEvent> = Vec::new();
 
     // Variables tracking the runs of four and five such that runs are not
@@ -299,6 +299,9 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
     }
 
     for combination in &combinations {
+        // Sorts the hand so that equivalent score events will be equal
+        let mut combination = combination.clone();
+        combination.sort();
         // Flag for whether the current combination is a tuple; checks for pairs, triples, and
         // quadruples; flag is set to false when there is a value that does not match the value of
         // the first card of the combination
@@ -313,7 +316,7 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
         // a combination adds to 15
         let mut sum = 0;
 
-        for card in combination {
+        for card in &combination {
             // For every card in the combination, add the value to the sum, determine if the
             // combination is still a tuple thus far, and if a given value is present in the
             // combination
@@ -469,6 +472,7 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
             let mut nobs: Vec<deck::Card> = Vec::new();
             nobs.push(*card);
             nobs.push(starter);
+            nobs.sort();
             found_scores.push(ScoreEvent {
                 player_index: index as usize,
                 point_value: 1,
@@ -493,6 +497,7 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
     }
 
     // If the hand contains a flush of 4 or 5, push the relevant ScoreEvents
+    hand.sort();
     if num_matching_cards == 4 {
         found_scores.push(ScoreEvent {
             player_index: index as usize,
@@ -506,6 +511,7 @@ pub fn score_hand(index: u8, hand: Vec<deck::Card>, starter: deck::Card) -> Vec<
             all_cards.push(card);
         }
         all_cards.push(starter);
+        all_cards.sort();
 
         found_scores.push(ScoreEvent {
             player_index: index as usize,
