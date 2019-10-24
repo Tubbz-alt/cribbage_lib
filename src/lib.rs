@@ -645,21 +645,12 @@ impl Game {
             match selection {
                 // If no scores are sent
                 None => {
-                    // If underpegging is enabled, no score will be valid
-                    if self.is_underpegging {
-                        return Ok("Valid no selection for PlayScore");
-                    }
                     // If underpegging is disabled and a score event is present in
-                    // remaining_score_events, return an error
-                    else if self.remaining_score_events.len() != 0 {
+                    // remaining_score_events, return an error; otherwise the None is valid
+                    if self.remaining_score_events.len() != 0 && !self.is_underpegging {
                         return Err(
                             "Must enter the correct ScoreEvents when underpegging is disabled",
                         );
-                    }
-                    // If underpegging is disabled and there are no ScoreEvents in
-                    // remaining_score_events accept the no selection
-                    else {
-                        return Ok("Valid no selection for PlayScore");
                     }
                 }
                 // If scores are sent
@@ -726,13 +717,13 @@ impl Game {
                         let mut score_sum = 0;
                         for score in valid_scores {
                             score_sum += score.point_value;
+                        }
 
-                            self.players[self.index_active as usize].change_score(score_sum as i8);
+                        self.players[self.index_active as usize].change_score(score_sum as i8);
 
-                            if self.players[self.index_active as usize].front_peg_pos >= 121 {
-                                self.state = GameState::Win;
-                                return Ok("Play scoring complete and win");
-                            }
+                        if self.players[self.index_active as usize].front_peg_pos >= 121 {
+                            self.state = GameState::Win;
+                            return Ok("Play scoring complete and win");
                         }
                     }
                     // If underpegging is disabled
@@ -859,20 +850,20 @@ impl Game {
     // Processes the scoring of a hand in the show phase; leads to Win, ShowMuggins, CribScore, and
     // ShowScore
     fn show_score(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
-        let correct_scores = score::score_hand(
+        self.remaining_score_events = score::score_hand(
             self.index_active,
             self.players[self.index_active as usize].hand.clone(),
             self.starter_card,
         );
 
-        //TODO Manual scoring
+        // Manual scoring
         if self.is_manual_scoring {
             return Err("TODO");
         }
         // Automatic scoring
         else {
             let mut score_sum = 0;
-            for score in correct_scores {
+            for score in &self.remaining_score_events {
                 score_sum += score.point_value;
             }
 
@@ -884,8 +875,12 @@ impl Game {
             }
         }
 
-        // Prepares for the next player to score their cards or for the dealer to score their crib
-        if self.index_active == self.index_dealer {
+        // Prepares for overpegging calls, muggins, the next player to score their hand, or for the dealer to score their crib
+        if self.is_overpegging {
+            return Err("TODO");
+        } else if self.is_muggins {
+            self.state = GameState::CribMuggins;
+        } else if self.index_active == self.index_dealer {
             self.state = GameState::CribScore;
         } else {
             self.index_active = (self.index_active + 1) % self.players.len() as u8;
