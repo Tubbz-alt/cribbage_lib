@@ -4,6 +4,7 @@ pub mod score;
 mod tests;
 
 use std::convert::TryFrom;
+use std::mem;
 
 // Object representing a specific player in the game; keeps track of score and the hand
 #[derive(Debug, Clone)]
@@ -629,18 +630,36 @@ impl Game {
         Ok("Ready for next PlayGroup")
     }
 
-    // Processes the actual scoring of the play phase; leads to ResetPlay or PlayWaitForCard
-    fn play_score(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
+    // Processes the actual scoring of the play or show phase
+    // Leads to Win, PlayMuggins, ResetPlay, or PlayWaitForCard when starting from PlayScore
+    // Leads to Win, ShowMuggins, ShowScore, or CribScore when starting from ShowScore
+    // Leads to Win, CribMuggins, or Deal when starting from CribScore
+    fn score(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
         // The list of scores corresponding to the actual maximum value
-        // TODO Change play_score arg to u8
-        self.remaining_score_events =
-            score::play_score(self.index_active as usize, self.play_groups.last().unwrap());
+        // TODO Change play_score arg from usize to u8
+        if self.state == GameState::PlayScore {
+            self.remaining_score_events =
+                score::play_score(self.index_active as usize, self.play_groups.last().unwrap());
+        } else if self.state == GameState::ShowScore {
+            self.remaining_score_events = score::score_hand(
+                self.index_active,
+                self.players[self.index_active as usize].hand.clone(),
+                self.starter_card,
+            );
+        } else if self.state == GameState::CribScore {
+            self.remaining_score_events =
+                score::score_hand(self.index_dealer, self.crib.clone(), self.starter_card);
+        } else {
+            return Err("Unexpected state in play_score");
+        }
+
         // Flag set when a valid ThirtyOne PlayScoreType is present; indicates that the state
         // should change to ResetPlay instead of PlayWaitForCard
         self.reset_play = false;
 
         // Manual scoring
-        // TODO: Overpegging
+        // TODO: Overpegging; remove 121 checks when overpegging is enabled and check once after
+        // scores are contested
         if self.is_manual_scoring {
             match selection {
                 // If no scores are sent
@@ -655,6 +674,9 @@ impl Game {
                 }
                 // If scores are sent
                 Some(scores) => {
+                    // Final score change to apply at the end
+                    let mut score_change = 0;
+
                     // Create a list of every valid and invalid ScoreEvent in the selection
                     let mut valid_scores: Vec<score::ScoreEvent> = Vec::new();
                     let mut invalid_scores: Vec<score::ScoreEvent> = Vec::new();
@@ -662,8 +684,28 @@ impl Game {
                         let mut is_score_in_correct_scores = false;
                         for correct_score in &self.remaining_score_events {
                             if *score == *correct_score {
-                                valid_scores.push(score.clone());
+                                // If there is a flush of four in the crib, don't count it
+                                let mut skip = false;
+                                if self.state == GameState::CribScore {
+                                    match &correct_score.score_type {
+                                        score::ScoreType::Show(show_score_type) => {
+                                            match show_score_type {
+                                                score::ShowScoreType::FourFlush(_) => {
+                                                    skip = true;
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                if !skip {
+                                    valid_scores.push(score.clone());
+                                }
+
                                 is_score_in_correct_scores = true;
+
                                 // If there is a valid 31 ScoreEvent, set reset_play to true
                                 if score.score_type
                                     == score::ScoreType::Play(score::PlayScoreType::ThirtyOne)
@@ -689,8 +731,11 @@ impl Game {
                     // If overpegging is enabled
                     if self.is_overpegging {
                         // TODO Implement penalty for overpegging; opponent must catch
+                        // Add each invalid score to a list to check opponents validity call
+                        // against
                         return Err("TODO: Overpegging");
                     } else {
+                        // Do not allow invalid scores when overpegging is disabled
                         if invalid_scores.len() > 0 {
                             return Err("Invalid ScoreEvent when overpegging is disable");
                         }
@@ -719,12 +764,7 @@ impl Game {
                             score_sum += score.point_value;
                         }
 
-                        self.players[self.index_active as usize].change_score(score_sum as i8);
-
-                        if self.players[self.index_active as usize].front_peg_pos >= 121 {
-                            self.state = GameState::Win;
-                            return Ok("Play scoring complete and win");
-                        }
+                        score_change += score_sum;
                     }
                     // If underpegging is disabled
                     else {
@@ -739,15 +779,17 @@ impl Game {
                                 score_sum += score.point_value;
                             }
 
-                            self.players[self.index_active as usize].change_score(score_sum as i8);
-
-                            if self.players[self.index_active as usize].front_peg_pos >= 121 {
-                                self.state = GameState::Win;
-                                return Ok("Play scoring complete and win");
-                            }
+                            score_change += score_sum;
                         } else {
                             return Err("Incomplete score selection when underpegging is disabled");
                         }
+                    }
+
+                    self.players[self.index_active as usize].change_score(score_change as i8);
+
+                    if self.players[self.index_active as usize].front_peg_pos >= 121 {
+                        self.state = GameState::Win;
+                        return Ok("Scoring complete and win");
                     }
                 }
             }
@@ -764,25 +806,49 @@ impl Game {
 
             self.players[self.index_active as usize].change_score(score_sum as i8);
 
+            // Overpegging must be disabled when automatic scoring is enabled
             if self.players[self.index_active as usize].front_peg_pos >= 121 {
                 self.state = GameState::Win;
                 return Ok("Play scoring complete and win");
             }
         }
 
-        // Return to play or go to the muggins or PlayOpponentContest state
-        // TODO PlayOpponnentContest when overpegging is enable
-        if self.is_muggins {
-            self.state = GameState::PlayMuggins;
-        } else {
-            self.index_active = (self.index_active + 1) % self.players.len() as u8;
-            if !self.reset_play {
-                self.state = GameState::PlayWaitForCard;
+        // TODO OpponnentContest states when overpegging is enable
+        if self.state == GameState::PlayScore {
+            if self.is_overpegging {
+                return Err("TODO");
+            } else if self.is_muggins {
+                self.state = GameState::PlayMuggins;
             } else {
-                self.state = GameState::ResetPlay;
+                self.index_active = (self.index_active + 1) % self.players.len() as u8;
+                if !self.reset_play {
+                    self.state = GameState::PlayWaitForCard;
+                } else {
+                    self.state = GameState::ResetPlay;
+                }
+            }
+        } else if self.state == GameState::ShowScore {
+            if self.is_overpegging {
+                return Err("TODO");
+            } else if self.is_muggins {
+                self.state = GameState::ShowMuggins;
+            } else if self.index_active == self.index_dealer {
+                self.state = GameState::CribScore;
+            } else {
+                self.index_active = (self.index_active + 1) % self.players.len() as u8;
+            }
+        } else {
+            if self.is_overpegging {
+                return Err("TODO");
+            } else if self.is_underpegging {
+                self.state = GameState::CribMuggins;
+            } else {
+                self.index_dealer = (self.index_dealer + 1) % self.players.len() as u8;
+                self.state = GameState::Deal;
             }
         }
-        Ok("Play scoring complete")
+
+        Ok("Scoring complete")
     }
 
     fn play_muggins(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
@@ -847,86 +913,6 @@ impl Game {
         }
     }
 
-    // Processes the scoring of a hand in the show phase; leads to Win, ShowMuggins, CribScore, and
-    // ShowScore
-    fn show_score(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
-        self.remaining_score_events = score::score_hand(
-            self.index_active,
-            self.players[self.index_active as usize].hand.clone(),
-            self.starter_card,
-        );
-
-        // Manual scoring
-        if self.is_manual_scoring {
-            return Err("TODO");
-        }
-        // Automatic scoring
-        else {
-            let mut score_sum = 0;
-            for score in &self.remaining_score_events {
-                score_sum += score.point_value;
-            }
-
-            self.players[self.index_active as usize].change_score(score_sum as i8);
-
-            if self.players[self.index_active as usize].front_peg_pos >= 121 {
-                self.state = GameState::Win;
-                return Ok("Show scoring complete and win");
-            }
-        }
-
-        // Prepares for overpegging calls, muggins, the next player to score their hand, or for the dealer to score their crib
-        if self.is_overpegging {
-            return Err("TODO");
-        } else if self.is_muggins {
-            self.state = GameState::CribMuggins;
-        } else if self.index_active == self.index_dealer {
-            self.state = GameState::CribScore;
-        } else {
-            self.index_active = (self.index_active + 1) % self.players.len() as u8;
-        }
-
-        Ok("Show scoring complete")
-    }
-
-    // Processes the scoring of the crib either automatically or manually; leads to Win,
-    // CribMuggins, and Deal
-    fn crib_score(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
-        let mut correct_scores =
-            score::score_hand(self.index_dealer, self.crib.clone(), self.starter_card);
-
-        // TODO: Double check that the flush rule is real
-        correct_scores.retain({
-            |score| match score.score_type {
-                score::ScoreType::Show(score::ShowScoreType::FourFlush(_)) => false,
-                _ => true,
-            }
-        });
-
-        // TODO: Manual scoring
-        if self.is_manual_scoring {
-            return Err("TODO");
-        }
-        // Automatic scoring
-        else {
-            let mut score_sum = 0;
-            for score in correct_scores {
-                score_sum += score.point_value;
-            }
-
-            self.players[self.index_dealer as usize].change_score(score_sum as i8);
-
-            if self.players[self.index_active as usize].front_peg_pos >= 121 {
-                self.state = GameState::Win;
-                return Ok("Crib scoring complete and win");
-            }
-        }
-
-        self.index_dealer = (self.index_dealer + 1) % self.players.len() as u8;
-        self.state = GameState::Deal;
-        Ok("Crib scoring complete")
-    }
-
     // Processes the GameEvent objects to progress the model of the game
     pub fn process_event(&mut self, event: GameEvent) -> Result<&str, &str> {
         match (self.state, event) {
@@ -986,9 +972,9 @@ impl Game {
             (GameState::ResetPlay, _) => Err("Expected Confirmation event to ResetPlay"),
 
             // Scores the play phase of the game automatically or manually
-            (GameState::PlayScore, GameEvent::Confirmation) => Game::play_score(self, None),
+            (GameState::PlayScore, GameEvent::Confirmation) => Game::score(self, None),
             (GameState::PlayScore, GameEvent::ManScoreSelection(selection)) => {
-                Game::play_score(self, selection)
+                Game::score(self, selection)
             }
             (GameState::PlayScore, _) => {
                 Err("Expected Confirmation or ManScoreSelection event to PlayAutoScore")
@@ -1004,9 +990,9 @@ impl Game {
             }
 
             // Scores the show phase of the game automatically or manually
-            (GameState::ShowScore, GameEvent::Confirmation) => Game::show_score(self, None),
+            (GameState::ShowScore, GameEvent::Confirmation) => Game::score(self, None),
             (GameState::ShowScore, GameEvent::ManScoreSelection(selection)) => {
-                Game::show_score(self, selection)
+                Game::score(self, selection)
             }
             (GameState::ShowScore, _) => {
                 Err("Expected Confirmation or ManScoreSelection event to ShowScore")
@@ -1024,9 +1010,9 @@ impl Game {
             }
 
             // Processes the scoring of the crib automatically or manually
-            (GameState::CribScore, GameEvent::Confirmation) => Game::crib_score(self, None),
+            (GameState::CribScore, GameEvent::Confirmation) => Game::score(self, None),
             (GameState::CribScore, GameEvent::ManScoreSelection(selection)) => {
-                Game::crib_score(self, selection)
+                Game::score(self, selection)
             }
             (GameState::CribScore, _) => {
                 Err("Expected Confirmation of ManScoreSelection event to CribScore")
