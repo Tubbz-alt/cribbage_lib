@@ -851,6 +851,7 @@ impl Game {
         Ok("Scoring complete")
     }
 
+    // Processes any muggins calls for any muggins state
     fn play_muggins(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
         match selection {
             None => {

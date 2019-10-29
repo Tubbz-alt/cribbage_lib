@@ -922,14 +922,14 @@ fn show_automatic_test() {
     // Pone scores
     assert_eq!(
         game.process_event(super::GameEvent::Confirmation),
-        Ok("Show scoring complete"),
+        Ok("Scoring complete"),
     );
     assert_eq!(game.players[1].front_peg_pos, 12);
 
     // Dealer scores main hand
     assert_eq!(
         game.process_event(super::GameEvent::Confirmation),
-        Ok("Show scoring complete"),
+        Ok("Scoring complete"),
     );
     assert_eq!(game.players[0].front_peg_pos, 9);
 
@@ -941,7 +941,7 @@ fn show_automatic_test() {
 
     assert_eq!(
         game.process_event(super::GameEvent::Confirmation),
-        Ok("Crib scoring complete"),
+        Ok("Scoring complete"),
     );
     assert_eq!(game.players[0].front_peg_pos, 29);
 }
