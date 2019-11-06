@@ -1220,17 +1220,12 @@ fn show_automatic_test() {
         game.process_event(super::GameEvent::Confirmation),
         Ok("Scoring complete"),
     );
-    assert_eq!(game.players[0].front_peg_pos, 9);
+    assert_eq!(game.players[0].front_peg_pos, 13);
 
     // Dealer scores crib
-    println!(
-        "{:?}",
-        super::score::score_hand(0, hands[2].clone(), return_card('8', 'S'))
-    );
-
     assert_eq!(
         game.process_event(super::GameEvent::Confirmation),
         Ok("Scoring complete"),
     );
-    assert_eq!(game.players[0].front_peg_pos, 29);
+    assert_eq!(game.players[0].front_peg_pos, 33);
 }
