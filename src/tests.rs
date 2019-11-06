@@ -780,9 +780,246 @@ fn auto_hand_score_test() {
     ];
 
     expected_score_events.sort();
-    let score_events_results = super::score::score_hand(0, hand.clone(), return_card('5', 'S'));
 
-    assert_eq!(expected_score_events, score_events_results);
+    assert_eq!(
+        expected_score_events,
+        super::score::score_hand(0, hand.clone(), return_card('5', 'S'))
+    );
+
+    // Example hands found on the rules of cribbage Wikipedia page
+    hand = vec![
+        return_card('5', 'S'),
+        return_card('4', 'S'),
+        return_card('2', 'S'),
+        return_card('6', 'H'),
+    ];
+
+    let mut score_event_card_vectors = vec![
+        vec![
+            return_card('4', 'S'),
+            return_card('5', 'S'),
+            return_card('6', 'H'),
+        ],
+        vec![
+            return_card('4', 'S'),
+            return_card('5', 'H'),
+            return_card('6', 'H'),
+        ],
+        vec![return_card('5', 'H'), return_card('5', 'S')],
+    ];
+
+    for event_cards in &mut score_event_card_vectors {
+        event_cards.sort();
+    }
+
+    expected_score_events = vec![
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                score_event_card_vectors[0].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                score_event_card_vectors[1].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Pair(
+                score_event_card_vectors[2].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 3,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                score_event_card_vectors[0].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 3,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                score_event_card_vectors[1].clone(),
+            )),
+        },
+    ];
+
+    expected_score_events.sort();
+
+    assert_eq!(
+        expected_score_events,
+        super::score::score_hand(0, hand.clone(), return_card('5', 'H'))
+    );
+
+    hand = vec![
+        return_card('6', 'D'),
+        return_card('J', 'H'),
+        return_card('4', 'H'),
+        return_card('7', 'C'),
+    ];
+
+    let mut score_event_card_vectors = vec![
+        vec![return_card('J', 'H'), return_card('5', 'H')],
+        vec![
+            return_card('6', 'D'),
+            return_card('5', 'H'),
+            return_card('4', 'H'),
+        ],
+        vec![
+            return_card('4', 'H'),
+            return_card('5', 'H'),
+            return_card('6', 'D'),
+            return_card('7', 'C'),
+        ],
+        vec![return_card('5', 'H'), return_card('J', 'H')],
+    ];
+
+    for event_cards in &mut score_event_card_vectors {
+        event_cards.sort();
+    }
+
+    expected_score_events = vec![
+        super::score::ScoreEvent {
+            player_index: 1,
+            point_value: 2,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                score_event_card_vectors[0].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 1,
+            point_value: 2,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                score_event_card_vectors[1].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 1,
+            point_value: 4,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                score_event_card_vectors[2].clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 1,
+            point_value: 1,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Nobs(
+                score_event_card_vectors[3].clone(),
+            )),
+        },
+    ];
+
+    expected_score_events.sort();
+
+    assert_eq!(
+        expected_score_events,
+        super::score::score_hand(1, hand.clone(), return_card('5', 'H'))
+    );
+
+    // Tests for triples, quadruples, and flushes of four to fill in the gaps of the above tests
+    hand = vec![
+        return_card('A', 'D'),
+        return_card('A', 'H'),
+        return_card('A', 'S'),
+        return_card('A', 'C'),
+    ];
+
+    let mut score_event_card_vectors = vec![vec![
+        return_card('A', 'H'),
+        return_card('A', 'C'),
+        return_card('A', 'S'),
+        return_card('A', 'D'),
+    ]];
+
+    for event_cards in &mut score_event_card_vectors {
+        event_cards.sort();
+    }
+
+    expected_score_events = vec![super::score::ScoreEvent {
+        player_index: 0,
+        point_value: 12,
+        score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Quadruple(
+            score_event_card_vectors[0].clone(),
+        )),
+    }];
+
+    expected_score_events.sort();
+
+    assert_eq!(
+        expected_score_events,
+        super::score::score_hand(0, hand.clone(), return_card('5', 'H'))
+    );
+
+    hand = vec![
+        return_card('A', 'D'),
+        return_card('A', 'H'),
+        return_card('A', 'S'),
+        return_card('2', 'C'),
+    ];
+
+    let mut score_event_card_vectors = vec![vec![
+        return_card('A', 'H'),
+        return_card('A', 'D'),
+        return_card('A', 'S'),
+    ]];
+
+    for event_cards in &mut score_event_card_vectors {
+        event_cards.sort();
+    }
+
+    expected_score_events = vec![super::score::ScoreEvent {
+        player_index: 0,
+        point_value: 6,
+        score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Triple(
+            score_event_card_vectors[0].clone(),
+        )),
+    }];
+
+    expected_score_events.sort();
+
+    assert_eq!(
+        expected_score_events,
+        super::score::score_hand(0, hand.clone(), return_card('5', 'H'))
+    );
+
+    hand = vec![
+        return_card('2', 'D'),
+        return_card('4', 'D'),
+        return_card('6', 'D'),
+        return_card('8', 'D'),
+    ];
+
+    let mut score_event_card_vectors = vec![vec![
+        return_card('2', 'D'),
+        return_card('4', 'D'),
+        return_card('6', 'D'),
+        return_card('8', 'D'),
+    ]];
+
+    for event_cards in &mut score_event_card_vectors {
+        event_cards.sort();
+    }
+
+    expected_score_events = vec![super::score::ScoreEvent {
+        player_index: 0,
+        point_value: 4,
+        score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FourFlush(
+            score_event_card_vectors[0].clone(),
+        )),
+    }];
+
+    expected_score_events.sort();
+
+    assert_eq!(
+        expected_score_events,
+        super::score::score_hand(0, hand.clone(), return_card('T', 'H'))
+    );
 }
 
 #[test]
@@ -888,7 +1125,7 @@ fn play_automatic_test() {
         Err("Card played must be in the active player's hand"),
     );
 
-    // No cards left test 12 02
+    // No cards left test
     test.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
         test.players[0].hand[2],
     )));
@@ -952,7 +1189,7 @@ fn show_automatic_test() {
             return_card('4', 'S'),
         ],
         vec![
-            return_card('4', 'S'),
+            return_card('4', 'C'),
             return_card('5', 'S'),
             return_card('5', 'C'),
             return_card('6', 'S'),

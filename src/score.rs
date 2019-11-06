@@ -301,9 +301,9 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
         }
     }
 
-    for combination in &combinations {
+    for combination_t in &combinations {
         // Sorts the hand so that equivalent score events will be equal
-        let mut combination = combination.clone();
+        let mut combination = combination_t.clone();
         combination.sort();
         // Flag for whether the current combination is a tuple; checks for pairs, triples, and
         // quadruples; flag is set to false when there is a value that does not match the value of
@@ -345,7 +345,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                 });
             } else {
                 value_triple_or_quadruple = Some(combination[0].value);
-                if combinations.len() == 3 {
+                if combination.len() == 3 {
                     if max_tuple_length < 3 {
                         max_tuple_length = 3;
                     }
@@ -354,7 +354,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                         point_value: 6,
                         score_type: ScoreType::Show(ShowScoreType::Triple(combination.to_vec())),
                     });
-                } else if combinations.len() == 4 {
+                } else if combination.len() == 4 {
                     if max_tuple_length < 4 {
                         max_tuple_length = 4;
                     }
