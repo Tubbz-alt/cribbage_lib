@@ -4,7 +4,7 @@ use std::cmp;
 // Enum indicating the type of scoring events encountered during the play phase
 // Scoring is based on the entire PlayGroup
 // TODO Log Nibs and LastCard event as needed in the relevant portion of the main file
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum PlayScoreType {
     Nibs,         // Jack as starter card; two points for dealer
     Pair,         // Two cards with the same value; 2pts
@@ -20,7 +20,7 @@ pub enum PlayScoreType {
 // Enum's options contain the cards used to make up each score event
 // Allow manual scoring to count triples and quadruples as multiple pairs and to score double runs,
 // triple runs, and double double runs with one selection
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ShowScoreType {
     // Any combination of cards which add to 15; two pts
     Fifteen(Vec<deck::Card>),
@@ -41,7 +41,7 @@ pub enum ShowScoreType {
 }
 
 // Enum for indicating whether a score event was made during the play phase or the show phase
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ScoreType {
     Play(PlayScoreType),
     Show(ShowScoreType),
@@ -51,12 +51,15 @@ pub enum ScoreType {
 // Used in logs of the game, manual scoring selection/confirmation, and for automatic scoring
 // Vectors of ScoreEvents are returned by the scoring functions in this file to represent the
 // correct score of each hand or PlayGroup
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct ScoreEvent {
     pub score_type: ScoreType,
     pub player_index: usize,
     pub point_value: u8,
 }
+
+// TODO Test validity of passed PlayGroups and hands in both scoring functions such as verifying
+// hand length or checking for repeated cards
 
 // Returns the score value of the last addition to a given PlayGroup
 pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEvent> {
@@ -451,7 +454,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                             }
                             // If any card in the smaller run is not contained in the bigger, then
                             // the large run does not contain the small run
-                            if !is_current_card_in_larger_run {
+                            if !is_current_card_in_larger_run || big_run == *small_run {
                                 large_contains_small = false;
                             }
                         }
@@ -519,6 +522,8 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
             score_type: ScoreType::Show(ShowScoreType::FiveFlush(all_cards)),
         });
     }
+
+    found_scores.sort();
 
     found_scores
 }

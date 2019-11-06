@@ -334,7 +334,7 @@ fn deal_test() {
     // Confirm that program deals six cards to each player when there are two players
     test = return_basic_game(2, false);
     cut_until_dealer_chosen(&mut test);
-    test.process_event(super::GameEvent::Confirmation);
+    test.process_event(super::GameEvent::Confirmation).unwrap();
     for player in &test.players {
         assert_eq!(player.hand.len(), 6);
     }
@@ -342,7 +342,7 @@ fn deal_test() {
     // Confirm that program deals five cards to each player when there are three players
     test = return_basic_game(3, false);
     cut_until_dealer_chosen(&mut test);
-    test.process_event(super::GameEvent::Confirmation);
+    test.process_event(super::GameEvent::Confirmation).unwrap();
     for player in &test.players {
         assert_eq!(player.hand.len(), 5);
     }
@@ -350,7 +350,7 @@ fn deal_test() {
     // Confirm that program deals five cards to each player when there are four players
     test = return_basic_game(4, false);
     cut_until_dealer_chosen(&mut test);
-    test.process_event(super::GameEvent::Confirmation);
+    test.process_event(super::GameEvent::Confirmation).unwrap();
     for player in &test.players {
         assert_eq!(player.hand.len(), 5);
     }
@@ -359,7 +359,7 @@ fn deal_test() {
     // the dealer when there are five players
     test = return_basic_game(5, false);
     cut_until_dealer_chosen(&mut test);
-    test.process_event(super::GameEvent::Confirmation);
+    test.process_event(super::GameEvent::Confirmation).unwrap();
     for (index, player) in test.players.iter().enumerate() {
         if index == test.index_dealer as usize {
             assert_eq!(player.hand.len(), 4);
@@ -601,6 +601,8 @@ fn check_nibs_test() {
 
 #[test]
 fn auto_play_score_test() {
+    // Tests the actual play_score function used to determine the perfect scoring of a play
+
     // Checks for 15
     let mut test = super::PlayGroup {
         cards: vec![return_card('T', 'S'), return_card('5', 'S')],
@@ -738,7 +740,55 @@ fn auto_play_score_test() {
 }
 
 #[test]
+fn auto_hand_score_test() {
+    // Tests the function to find the perfect scoring of a given hand
+    // super::score::score_hand(index, hand, starter); returns a Vec<ScoreEvent>
+
+    let mut hand: Vec<super::deck::Card> = vec![
+        return_card('A', 'S'),
+        return_card('2', 'S'),
+        return_card('3', 'S'),
+        return_card('4', 'S'),
+    ];
+
+    let mut hand_and_starter = hand.clone();
+    hand_and_starter.push(return_card('5', 'S'));
+    hand_and_starter.sort();
+
+    let mut expected_score_events: Vec<super::score::ScoreEvent> = vec![
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 5,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                hand_and_starter.clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 5,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FiveFlush(
+                hand_and_starter.clone(),
+            )),
+        },
+        super::score::ScoreEvent {
+            player_index: 0,
+            point_value: 2,
+            score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                hand_and_starter.clone(),
+            )),
+        },
+    ];
+
+    expected_score_events.sort();
+    let score_events_results = super::score::score_hand(0, hand.clone(), return_card('5', 'S'));
+
+    assert_eq!(expected_score_events, score_events_results);
+}
+
+#[test]
 fn play_automatic_test() {
+    // Tests the play and score loop of the game with automatic scoring
+
     // Test game setup
     let mut hands: Vec<Vec<super::deck::Card>> = Vec::new();
     hands.push(Vec::new());
@@ -858,6 +908,8 @@ fn play_automatic_test() {
 #[test]
 fn play_manual_test() {
     // Tests the scoring of cards when manual scoring is enabled
+    // Previous test tests for all the possibilities in the actual play so this test can just focus
+    // on scoring
     // Tests with/without underscoring and with/without muggins
 
     // Test game setup

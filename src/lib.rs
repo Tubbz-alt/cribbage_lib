@@ -852,7 +852,10 @@ impl Game {
     }
 
     // Processes any muggins calls for any muggins state
-    fn play_muggins(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
+    // Leads to Win, ResetPlay, or PlayWaitForCard when starting from PlayMuggins
+    // Leads to Win, ShowScore, or CribScore when starting from ShowMuggins
+    // Leads to Win or Deal when starting from CribMuggins
+    fn muggins(&mut self, selection: Option<Vec<score::ScoreEvent>>) -> Result<&str, &str> {
         match selection {
             None => {
                 // Prepares to return to the game
@@ -865,6 +868,14 @@ impl Game {
                 Ok("No muggins selection")
             }
             Some(muggins_selections) => {
+                // Creates a list of score values correspondeing to each player index such as to
+                // total the ScoreEvent point values
+                let mut score_changes: Vec<i8> = Vec::with_capacity(self.players.len());
+                // Potential FIXME; off by one error
+                for _i in 0..self.players.len() {
+                    score_changes.push(0);
+                }
+
                 // Create a list of which muggins selections are valid and which are invalid
                 let mut valid_scores: Vec<score::ScoreEvent> = Vec::new();
                 let mut invalid_scores: Vec<score::ScoreEvent> = Vec::new();
@@ -893,23 +904,53 @@ impl Game {
                     // Disallow invalid scores when overpegging is disabled
                     if invalid_scores.len() > 0 {
                         return Err("Invalid muggins selection");
-                    } else {
-                        // TODO Combine selections by the same player into one score change
+                    }
+                    // Add points for the proper player based on the index given in the
+                    // ScoreEvent
+                    else {
                         for score in valid_scores {
-                            self.players[score.player_index].change_score(score.point_value as i8);
+                            score_changes[score.player_index] += score.point_value as i8;
                         }
                     }
                 }
 
-                // Prepares the game for the next card to be played or the ResetGame state to
-                // prepare the next play group
-                self.index_active = (self.index_active + 1) % self.players.len() as u8;
-                if !self.reset_play {
-                    self.state = GameState::PlayWaitForCard;
-                } else {
-                    self.state = GameState::ResetPlay;
+                // Executes the total score changes for each player
+                // TODO Rewrite to process muggins calls in the order in which they are sent such
+                // that scores are checked appropriately; generally figure out how muggins works
+                // with more than two players
+                for (index, score_change) in score_changes.iter().enumerate() {
+                    if *score_change != 0 {
+                        self.players[index].change_score(*score_change);
+                        if self.players[index].front_peg_pos >= 121 {
+                            self.state = GameState::Win;
+                            return Ok("Muggins score and win");
+                        }
+                    }
                 }
-                return Ok("Play muggins complete");
+
+                if self.state == GameState::PlayMuggins {
+                    // Leads to ResetPlay or PlayWaitForCard when starting from PlayMuggins
+                    self.index_active = (self.index_active + 1) % self.players.len() as u8;
+                    if !self.reset_play {
+                        self.state = GameState::PlayWaitForCard;
+                    } else {
+                        self.state = GameState::ResetPlay;
+                    }
+                } else if self.state == GameState::ShowMuggins {
+                    // Leads to ShowScore or CribScore when starting from ShowMuggins
+                    if self.index_active != self.index_dealer {
+                        self.index_active = (self.index_active + 1) % self.players.len() as u8;
+                        self.state = GameState::ShowScore;
+                    } else {
+                        self.state = GameState::CribScore;
+                    }
+                } else if self.state == GameState::CribMuggins {
+                    // Leads to Deal when starting from CribMuggins
+                    self.index_dealer = (self.index_dealer + 1) % self.players.len() as u8;
+                    self.state = GameState::Deal;
+                }
+
+                return Ok("Muggins complete");
             }
         }
     }
@@ -982,9 +1023,9 @@ impl Game {
             }
 
             // Processes any calls of muggins for the play phase of the game
-            (GameState::PlayMuggins, GameEvent::Confirmation) => Game::play_muggins(self, None),
+            (GameState::PlayMuggins, GameEvent::Confirmation) => Game::muggins(self, None),
             (GameState::PlayMuggins, GameEvent::Muggins(selection)) => {
-                Game::play_muggins(self, selection)
+                Game::muggins(self, selection)
             }
             (GameState::PlayMuggins, _) => {
                 Err("Expected Confirmation of Muggins event to PlayMuggins")
@@ -1000,11 +1041,9 @@ impl Game {
             }
 
             // Processes any call of muggins for the show phase of the game
-            (GameState::ShowMuggins, GameEvent::Confirmation) => {
-                Err("TODO Confirmation ShowMuggins")
-            }
+            (GameState::ShowMuggins, GameEvent::Confirmation) => Game::muggins(self, None),
             (GameState::ShowMuggins, GameEvent::Muggins(selection)) => {
-                Err("TODO Muggins ShowMuggins")
+                Game::muggins(self, selection)
             }
             (GameState::ShowMuggins, _) => {
                 Err("Expected Confirmation or Muggins event to ShowMuggins")
@@ -1020,11 +1059,9 @@ impl Game {
             }
 
             // Processes any call of muggins for the crib
-            (GameState::CribMuggins, GameEvent::Confirmation) => {
-                Err("TODO Confirmation CribMuggins")
-            }
+            (GameState::CribMuggins, GameEvent::Confirmation) => Game::muggins(self, None),
             (GameState::CribMuggins, GameEvent::Muggins(selection)) => {
-                Err("TODO Muggins CribMuggins")
+                Game::muggins(self, selection)
             }
             (GameState::CribMuggins, _) => {
                 Err("Expected Confirmation or Muggins event to CribMuggins")
