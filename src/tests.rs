@@ -1168,11 +1168,109 @@ fn play_manual_test() {
     let mut game = game_setup(
         hands.clone(),
         return_card('2', 'C'),
-        super::GameState::ShowScore,
+        super::GameState::PlayWaitForCard,
     );
     game.is_manual_scoring = true;
 
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('4', 'S'),
+    )))
+    .unwrap();
+
+    // Overscoring disabled error check
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+            }
+        ]))),
+        Err("Invalid ScoreEvent when overpegging is disabled")
+    );
+
+    // TODO Overscoring enabled
+
     // Test with underscoring disabled
+
+    // Valid none with underscoring disabled
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Ok("Scoring complete")
+    );
+
+    // Invalid none with underscoring disabled
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('4', 'D'),
+    )))
+    .unwrap();
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Err("Must enter the correct ScoreEvents when underpegging is disabled")
+    );
+
+    // Valid score selection passed
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Pair)
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    // Incomplete score selection with underscoring disabled
+    let mut game = game_setup(
+        hands.clone(),
+        return_card('2', 'C'),
+        super::GameState::PlayWaitForCard,
+    );
+    game.is_manual_scoring = true;
+
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('4', 'S'),
+    )))
+    .unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('5', 'S'),
+    )))
+    .unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('6', 'S'),
+    )))
+    .unwrap();
+
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 2,
+                player_index: 1,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+            }
+        ]))),
+        Err("Incomplete score selection when underpegging is disabled")
+    );
+
+    // Complete score selection with underscoring disabled
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 2,
+                player_index: 1,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+            },
+            super::score::ScoreEvent {
+                point_value: 3,
+                player_index: 1,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Straight(3)),
+            }
+        ]))),
+        Ok("Scoring complete")
+    );
 
     // Test with underscoring enabled and muggins disabled
 

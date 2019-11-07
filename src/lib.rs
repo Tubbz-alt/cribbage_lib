@@ -737,7 +737,7 @@ impl Game {
                     } else {
                         // Do not allow invalid scores when overpegging is disabled
                         if invalid_scores.len() > 0 {
-                            return Err("Invalid ScoreEvent when overpegging is disable");
+                            return Err("Invalid ScoreEvent when overpegging is disabled");
                         }
                     }
 
