@@ -1273,8 +1273,105 @@ fn play_manual_test() {
     );
 
     // Test with underscoring enabled and muggins disabled
+    let mut game = game_setup(
+        hands.clone(),
+        return_card('2', 'C'),
+        super::GameState::PlayWaitForCard,
+    );
+    game.is_manual_scoring = true;
+    game.is_underpegging = true;
+
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('4', 'S'),
+    )))
+    .unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('5', 'S'),
+    )))
+    .unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('6', 'S'),
+    )))
+    .unwrap();
+
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 2,
+                player_index: 1,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+            }
+        ]))),
+        Ok("Scoring complete")
+    );
+    assert_eq!(game.players[1].front_peg_pos, 2);
 
     // Test with underscoring and muggins enabled
+    let mut game = game_setup(
+        hands.clone(),
+        return_card('2', 'C'),
+        super::GameState::PlayWaitForCard,
+    );
+    game.is_manual_scoring = true;
+    game.is_underpegging = true;
+    game.is_muggins = true;
+
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('4', 'S'),
+    )))
+    .unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('5', 'S'),
+    )))
+    .unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Confirmation).unwrap();
+    game.process_event(super::GameEvent::Play(super::PlayTurn::CardSelected(
+        return_card('6', 'S'),
+    )))
+    .unwrap();
+
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 2,
+                player_index: 1,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+            }
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::Muggins(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 2,
+                player_index: 0,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Fifteen),
+            },
+            super::score::ScoreEvent {
+                point_value: 3,
+                player_index: 0,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Straight(3)),
+            }
+        ]))),
+        Err("Invalid muggins selection")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::Muggins(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 3,
+                player_index: 0,
+                score_type: super::score::ScoreType::Play(super::score::PlayScoreType::Straight(3)),
+            }
+        ]))),
+        Ok("Muggins complete")
+    );
 }
 
 #[test]

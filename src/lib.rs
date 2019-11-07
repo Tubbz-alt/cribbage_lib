@@ -840,7 +840,7 @@ impl Game {
         } else {
             if self.is_overpegging {
                 return Err("TODO");
-            } else if self.is_underpegging {
+            } else if self.is_muggins {
                 self.state = GameState::CribMuggins;
             } else {
                 self.index_dealer = (self.index_dealer + 1) % self.players.len() as u8;
@@ -882,7 +882,9 @@ impl Game {
                 for selection_event in &muggins_selections {
                     let mut is_selection_event_in_remaining = false;
                     for remaining_event in &self.remaining_score_events {
-                        if *remaining_event == *selection_event {
+                        if remaining_event.score_type == selection_event.score_type
+                            && remaining_event.point_value == selection_event.point_value
+                        {
                             valid_scores.push(selection_event.clone());
                             is_selection_event_in_remaining = true;
                             if remaining_event.score_type
