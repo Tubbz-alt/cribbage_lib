@@ -64,7 +64,7 @@ pub enum GameEvent {
     // when a player must cut the deck or simply when the timing of a state change is decided by
     // the program implementing this library
     Confirmation,
-    Declination,
+    Denial,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -959,6 +959,23 @@ impl Game {
         }
     }
 
+    // Deals with the winning of a game and whether or not to prepare for another game
+    fn win(&mut self, is_playing_again: bool) -> Result<&str, &str> {
+        // TODO, just ends the game here
+        self.state = GameState::End;
+        if is_playing_again {
+            return Err("TODO Play again");
+        }
+
+        for player in &self.players {
+            if player.front_peg_pos >= 121 {
+                return Ok(&player.username);
+            }
+        }
+
+        Err("Win event when no player has won")
+    }
+
     // Processes the GameEvent objects to progress the model of the game
     pub fn process_event(&mut self, event: GameEvent) -> Result<&str, &str> {
         match (self.state, event) {
@@ -1072,8 +1089,8 @@ impl Game {
             }
 
             // Processes the end of a game
-            (GameState::Win, GameEvent::Confirmation) => Err("TODO Confirmation Win"),
-            (GameState::Win, GameEvent::Declination) => Err("TODO Declination Win"),
+            (GameState::Win, GameEvent::Confirmation) => Game::win(self, true),
+            (GameState::Win, GameEvent::Denial) => Game::win(self, false),
             // Processes the end of a match
 
             // For unexpected GameState
