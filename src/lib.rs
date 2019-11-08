@@ -680,6 +680,8 @@ impl Game {
                     // Create a list of every valid and invalid ScoreEvent in the selection
                     let mut valid_scores: Vec<score::ScoreEvent> = Vec::new();
                     let mut invalid_scores: Vec<score::ScoreEvent> = Vec::new();
+                    // TODO Allow invalid scores that are contained by valid scores eg a run of
+                    // three in a run of four (but not two runs of three) or a double in a triple
                     for score in &scores {
                         let mut is_score_in_correct_scores = false;
                         for correct_score in &self.remaining_score_events {

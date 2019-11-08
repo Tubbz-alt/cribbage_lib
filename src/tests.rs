@@ -1424,3 +1424,579 @@ fn show_automatic_test() {
     );
     assert_eq!(game.players[0].front_peg_pos, 33);
 }
+
+#[test]
+fn show_manual_test() {
+    // Tests the manual scoring of the hands and crib
+
+    // Overpegging disabled invalid score check
+    // Game setup
+    let hands: Vec<Vec<super::deck::Card>> = vec![
+        vec![
+            return_card('A', 'S'),
+            return_card('2', 'S'),
+            return_card('3', 'S'),
+            return_card('4', 'S'),
+        ],
+        vec![
+            return_card('4', 'C'),
+            return_card('5', 'S'),
+            return_card('5', 'C'),
+            return_card('6', 'S'),
+        ],
+        vec![
+            return_card('7', 'S'),
+            return_card('7', 'C'),
+            return_card('7', 'D'),
+            return_card('7', 'H'),
+        ],
+    ];
+
+    let mut selections: Vec<Vec<Vec<super::deck::Card>>> = vec![
+        // Player one's hand
+        vec![
+            // Fifteen two & run of three
+            vec![
+                return_card('4', 'C'),
+                return_card('5', 'S'),
+                return_card('6', 'S'),
+            ],
+            // Fifteen four & run of three
+            vec![
+                return_card('4', 'C'),
+                return_card('5', 'C'),
+                return_card('6', 'S'),
+            ],
+            // Pair
+            vec![return_card('5', 'S'), return_card('5', 'C')],
+        ],
+        // Player zero's hand
+        vec![
+            // Fifteen two
+            vec![
+                return_card('3', 'S'),
+                return_card('4', 'S'),
+                return_card('8', 'S'),
+            ],
+            // Fifteen four
+            vec![
+                return_card('A', 'S'),
+                return_card('2', 'S'),
+                return_card('4', 'S'),
+                return_card('8', 'S'),
+            ],
+            // Run of four
+            vec![
+                return_card('A', 'S'),
+                return_card('2', 'S'),
+                return_card('3', 'S'),
+                return_card('4', 'S'),
+            ],
+            // Flush of five
+            vec![
+                return_card('A', 'S'),
+                return_card('2', 'S'),
+                return_card('3', 'S'),
+                return_card('4', 'S'),
+                return_card('8', 'S'),
+            ],
+        ],
+        // Player zero's crib
+        vec![
+            // Fifteen two
+            vec![return_card('7', 'S'), return_card('8', 'S')],
+            // Fifteen four
+            vec![return_card('7', 'C'), return_card('8', 'S')],
+            // Fifteen six
+            vec![return_card('7', 'D'), return_card('8', 'S')],
+            // Fifteen eight
+            vec![return_card('7', 'H'), return_card('8', 'S')],
+            // Quadruple
+            vec![
+                return_card('7', 'S'),
+                return_card('7', 'C'),
+                return_card('7', 'D'),
+                return_card('7', 'H'),
+            ],
+        ],
+    ];
+
+    // Sorts the selections such that ScoreEvents made with each selection are valid
+    for hand in &mut selections {
+        for selection in hand {
+            selection.sort();
+        }
+    }
+
+    let mut game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+    // Hands
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 4,
+                player_index: 1,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FourFlush(
+                    hands[1].clone()
+                )),
+            }
+        ]))),
+        Err("Invalid ScoreEvent when overpegging is disabled")
+    );
+    // Crib
+    game.state = super::GameState::CribScore;
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                point_value: 4,
+                player_index: 1,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FourFlush(
+                    hands[1].clone()
+                )),
+            }
+        ]))),
+        Err("Invalid ScoreEvent when overpegging is disabled")
+    );
+
+    // Underpegging disabled invalid None
+    // Game Setup
+    game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+    // Hands
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Err("Must enter the correct ScoreEvents when underpegging is disabled")
+    );
+    // Crib
+    game.state = super::GameState::CribScore;
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Err("Must enter the correct ScoreEvents when underpegging is disabled")
+    );
+
+    // Underpegging disabled incomplete ScoreEvent vector
+    // Game Setup
+    game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+    // Hands
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Pair(
+                    selections[0][2].clone()
+                )),
+            }
+        ]))),
+        Err("Incomplete score selection when underpegging is disabled")
+    );
+    // Crib
+    game.state = super::GameState::CribScore;
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][0].clone()
+                )),
+            }
+        ]))),
+        Err("Incomplete score selection when underpegging is disabled")
+    );
+
+    // Underpegging disabled valid ScoreEvent vector
+    // Game Setup
+    game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+    // Hands
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[0][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 3,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[0][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[0][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 3,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[0][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Pair(
+                    selections[0][2].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[1][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[1][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 4,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[1][2].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 5,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FiveFlush(
+                    selections[1][3].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+    // Crib
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][2].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][3].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 12,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Quadruple(
+                    selections[2][4].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(game.players[1].front_peg_pos, 12);
+    assert_eq!(game.players[0].front_peg_pos, 33);
+
+    // Underpegging enabled incomplete ScoreEvent vector
+    // Game Setup
+    game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+    game.is_underpegging = true;
+    // Hands
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[0][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 3,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[0][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[0][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 3,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[0][1].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[1][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 4,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[1][2].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 5,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FiveFlush(
+                    selections[1][3].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+    // Crib
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][2].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][3].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(game.players[1].front_peg_pos, 10);
+    assert_eq!(game.players[0].front_peg_pos, 19);
+
+    // Muggins enabled incomplete ScoreEvent vector
+    // Game Setup
+    game = game_setup(
+        hands.clone(),
+        return_card('8', 'S'),
+        super::GameState::ShowScore,
+    );
+    game.is_manual_scoring = true;
+    game.is_underpegging = true;
+    game.is_muggins = true;
+    // Hands
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[0][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 3,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[0][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Pair(
+                    selections[0][2].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::Muggins(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[0][0].clone()
+                )),
+            }
+        ]))),
+        Ok("Muggins complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 5,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FiveFlush(
+                    selections[1][3].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::Muggins(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 5,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::FiveFlush(
+                    selections[1][3].clone()
+                )),
+            },
+        ]))),
+        Err("Invalid muggins selection")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::Muggins(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[1][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 1,
+                point_value: 4,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Straight(
+                    selections[1][2].clone()
+                )),
+            },
+        ]))),
+        Ok("Muggins complete")
+    );
+    // Crib
+    assert_eq!(
+        game.process_event(super::GameEvent::ManScoreSelection(Some(vec![
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][0].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][1].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][2].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 2,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Fifteen(
+                    selections[2][3].clone()
+                )),
+            },
+            super::score::ScoreEvent {
+                player_index: 0,
+                point_value: 12,
+                score_type: super::score::ScoreType::Show(super::score::ShowScoreType::Quadruple(
+                    selections[2][4].clone()
+                )),
+            },
+        ]))),
+        Ok("Scoring complete")
+    );
+
+    assert_eq!(
+        game.process_event(super::GameEvent::Confirmation),
+        Ok("No muggins selection")
+    );
+
+    assert_eq!(game.players[1].front_peg_pos, 13);
+    assert_eq!(game.players[0].front_peg_pos, 27);
+}
