@@ -166,6 +166,7 @@ pub struct Game {
     last_player_index: u8,
 
     // The card that is cut and shared by all players' hands
+    // TODO Replace with Option<deck::Card> for when the starter card has yet to be chosen
     pub starter_card: deck::Card,
 
     // The extra hand given to the dealer after scoring their hand
@@ -493,8 +494,11 @@ impl Game {
                             Ok("Nibs call")
                         }
                     } else {
-                        //TODO Penalty for false call
-                        Err("Invalid nibs call")
+                        if self.is_overpegging {
+                            Err("Invalid nibs call")
+                        } else {
+                            Err("TODO")
+                        }
                     }
                 } else {
                     Err("Invalid ScoreEvent at NibsCheck")
@@ -1091,7 +1095,8 @@ impl Game {
             // Processes the end of a game
             (GameState::Win, GameEvent::Confirmation) => Game::win(self, true),
             (GameState::Win, GameEvent::Denial) => Game::win(self, false),
-            // Processes the end of a match
+
+            // TODO Processes the end of a match
 
             // For unexpected GameState
             (_, _) => Err("Unrecognized GameState"),

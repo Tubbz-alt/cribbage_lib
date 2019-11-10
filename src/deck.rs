@@ -1,9 +1,11 @@
 extern crate rand;
+extern crate serde;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CardSuit {
     Hearts,
     Diamonds,
@@ -11,7 +13,7 @@ pub enum CardSuit {
     Spades,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CardValue {
     Ace,
     Two,
@@ -64,7 +66,7 @@ pub fn return_play_value(card: Card) -> u8 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Card {
     pub suit: CardSuit,
     pub value: CardValue,
