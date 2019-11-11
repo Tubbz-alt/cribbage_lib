@@ -90,7 +90,11 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
     if current_group.cards.len() >= 3 {
         // Iterates though the indices of the length of the cards vector of the current
         // PlayGroup to 3, the minimum number of cards, and checks for a straight of each
-        // length while breaking at the first and largest present
+        // length while breaking at the first and largest present. Basically goes through all the n
+        // cards, then the n-1 last cards, then the n-2 last cards until it checks just the last
+        // three cards -- the minimum length of a run. The longest run possible is seven cards
+        // (as 1+2+3+4+5+6+7=28 and 31 is the maximum total of a PlayGroup) so it will only check
+        // the last seven cards at most.
         let length_or_7 = cmp::min(current_group.cards.len(), 7);
         for index_offset in (3..length_or_7 + 1).rev() {
             // Calculates the start position of the vector slice by subtracting the offset from
@@ -124,7 +128,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
             }
 
             // If the number of continuous values is the number of values searched then a run
-            // of index_offset cards is present in play; add that run value to the
+            // of length index_offset cards is present in play; add that run value to the
             // score_of_play vector and break from the loop to not double-count runs
             if max_num_continuous_values as usize == index_offset {
                 score_of_play.push(ScoreEvent {
@@ -139,9 +143,12 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
 
     if current_group.cards.len() >= 2 {}
 
-    // Couple, triple, quadruple check; 2, 6, and 12pts respectivelu
+    // Couple, triple, quadruple check; 2, 6, and 12pts respectively
     // Only begins checking when the PlayGroup has two cards
     if current_group.cards.len() >= 2 {
+        // Basically checks the last four cards for a quadruple, then the last three for a triple,
+        // then the last two for a double, but if there are less than four cards only check
+        // starting from the number of cards in the playgroup
         let num_cards_or_4 = cmp::min(4, current_group.cards.len());
         for index_offset in (2..num_cards_or_4 + 1).rev() {
             // Value of the last played card and whether or not the same value is found in the
@@ -223,7 +230,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
     let mut value_triple_or_quadruple: Option<deck::CardValue> = None;
     let mut max_tuple_length = 0;
 
-    // Create combinations of the five cards with a binary counter
+    // Create every combination of the five cards with a binary counter
     let mut combinations: Vec<Vec<deck::Card>> = Vec::new();
     let mut card_active = [false; 6];
     let mut wait_one = false;
@@ -301,9 +308,9 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
         }
     }
 
-    for combination_t in &combinations {
+    for combination in combinations {
         // Sorts the hand so that equivalent score events will be equal
-        let mut combination = combination_t.clone();
+        let mut combination = combination.clone();
         combination.sort();
         // Flag for whether the current combination is a tuple; checks for pairs, triples, and
         // quadruples; flag is set to false when there is a value that does not match the value of
@@ -366,8 +373,8 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                 }
             }
         }
-        // If the maximum number of consecutive values equal the number of cards in the
-        // combination
+        // If the maximum number of consecutive values equals the number of cards in the
+        // combination, then there is a straight
         let mut max_num_consecutive_values = 0;
         let mut num_consecutive_values = 0;
         for element in &is_present {
@@ -500,8 +507,8 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
     }
 
     // If the hand contains a flush of 4 or 5, push the relevant ScoreEvents
-    hand.sort();
     if num_matching_cards == 4 {
+        hand.sort();
         found_scores.push(ScoreEvent {
             player_index: index as usize,
             point_value: 4,
