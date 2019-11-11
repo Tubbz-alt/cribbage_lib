@@ -494,7 +494,7 @@ impl Game {
                             Ok("Nibs call")
                         }
                     } else {
-                        if self.is_overpegging {
+                        if !self.is_overpegging {
                             Err("Invalid nibs call")
                         } else {
                             Err("TODO")
