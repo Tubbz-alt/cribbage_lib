@@ -132,7 +132,7 @@ impl Deck {
 
     // Randomizes the order of the deck
     fn shuffle(&mut self) {
-        let mut rng = thread_rng() 
+        let mut rng = thread_rng();
         self.card_vector.shuffle(&mut rng);
     }
 
