@@ -76,13 +76,13 @@ pub struct Card {
 pub struct Deck {
     // card_vector public for debugging purposes, deal cards with reset_deck() and deal()
     pub card_vector: Vec<Card>,
-    rng: rand::rngs::ThreadRng,
+    rng: Option<rand::rngs::ThreadRng>,
 }
 
 pub fn new_deck() -> Deck {
     Deck {
         card_vector: Vec::new(),
-        rng: thread_rng(),
+        rng: None,
     }
 }
 
@@ -134,7 +134,10 @@ impl Deck {
 
     // Randomizes the order of the deck
     fn shuffle(&mut self) {
-        self.card_vector.shuffle(&mut self.rng);
+        if self.rng.is_none() {
+            self.rng = Some(thread_rng());
+        }
+        self.card_vector.shuffle(&mut self.rng.unwrap());
     }
 
     // Resets the deck to a full and shuffled state
