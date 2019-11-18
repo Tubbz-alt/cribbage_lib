@@ -277,8 +277,7 @@ impl Game {
         Ok("Received valid GameSetup event")
     }
 
-    // Processes the cut phase determining the first dealer after confirmation by player left of
-    // dealer; leads to Deal
+    // Processes the cut phase determining the first dealer after confirmation; leads to Deal
     fn process_cut(&mut self) -> Result<&str, &str> {
         // Start with shuffled deck; disabled in debug mode for manual editing of deck
         if !self.is_debug {
