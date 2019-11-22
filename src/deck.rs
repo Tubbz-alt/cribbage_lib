@@ -68,8 +68,8 @@ pub fn return_play_value(card: Card) -> u8 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Card {
-    pub suit: CardSuit,
     pub value: CardValue,
+    pub suit: CardSuit,
 }
 
 #[derive(Debug, Clone)]
