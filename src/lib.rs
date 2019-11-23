@@ -311,6 +311,9 @@ impl Game {
 
         // If the lowest value occurs twice, do not change the state
         if player_indices_of_lowest_value.len() > 1 {
+            if !self.is_debug {
+                self.deck.reset_deck();
+            }
             return Ok("Cut resulted in tie; redoing");
         }
         // Else change the dealer to the correct player index and change the state

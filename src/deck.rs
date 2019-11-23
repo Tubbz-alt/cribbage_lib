@@ -72,7 +72,7 @@ pub struct Card {
     pub suit: CardSuit,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Deck {
     // card_vector public for debugging purposes, deal cards with reset_deck() and deal()
     pub card_vector: Vec<Card>,

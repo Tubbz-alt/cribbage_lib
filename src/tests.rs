@@ -112,6 +112,15 @@ fn game_setup(
 }
 
 #[test]
+fn deck_test() {
+    let mut deck = super::deck::new_deck();
+    deck.reset_deck();
+    let first_deck = deck.clone();
+    deck.reset_deck();
+    assert!(deck != first_deck);
+}
+
+#[test]
 fn game_setup_test() {
     let mut names = Vec::new();
     names.push("Alice".to_string());
