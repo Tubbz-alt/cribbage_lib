@@ -286,6 +286,7 @@ impl Game {
 
         // Deal one card to each player
         for player in &mut self.players {
+            player.hand.clear();
             player.hand.push(self.deck.deal());
         }
 
