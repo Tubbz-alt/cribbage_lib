@@ -1,10 +1,11 @@
 use crate::deck;
+use serde::{Deserialize, Serialize};
 use std::cmp;
 
 // Enum indicating the type of scoring events encountered during the play phase
 // Scoring is based on the entire PlayGroup
 // TODO Log Nibs and LastCard event as needed in the relevant portion of the main file
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum PlayScoreType {
     Nibs,         // Jack as starter card; two points for dealer
     Pair,         // Two cards with the same value; 2pts
@@ -20,7 +21,7 @@ pub enum PlayScoreType {
 // Enum's options contain the cards used to make up each score event
 // Allow manual scoring to count triples and quadruples as multiple pairs and to score double runs,
 // triple runs, and double double runs with one selection
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum ShowScoreType {
     // Any combination of cards which add to 15; two pts
     Fifteen(Vec<deck::Card>),
@@ -41,7 +42,7 @@ pub enum ShowScoreType {
 }
 
 // Enum for indicating whether a score event was made during the play phase or the show phase
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum ScoreType {
     Play(PlayScoreType),
     Show(ShowScoreType),
@@ -51,7 +52,7 @@ pub enum ScoreType {
 // Used in logs of the game, manual scoring selection/confirmation, and for automatic scoring
 // Vectors of ScoreEvents are returned by the scoring functions in this file to represent the
 // correct score of each hand or PlayGroup
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct ScoreEvent {
     pub score_type: ScoreType,
     pub player_index: usize,
