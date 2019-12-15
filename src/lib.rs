@@ -511,7 +511,7 @@ impl Game {
     }
 
     // Returns whether or not a given card has already been played this round
-    fn has_card_been_played(&mut self, card_in_question: deck::Card) -> bool {
+    pub fn has_card_been_played(&mut self, card_in_question: deck::Card) -> bool {
         for card_group in &self.play_groups {
             if card_group.cards.contains(&card_in_question) {
                 return true;
