@@ -1,56 +1,28 @@
 pub mod deck;
+pub mod game_process_return;
+pub mod player;
 pub mod score;
-#[cfg(test)]
-mod tests;
+pub mod settings;
 
-use std::convert::TryFrom;
-use std::mem;
+mod state_logic;
 
-// Object representing a specific player in the game; keeps track of score and the hand
-#[derive(Debug, Clone)]
-pub struct Player {
-    pub username: String,
-    pub back_peg_pos: u8,
-    pub front_peg_pos: u8,
-    pub hand: Vec<deck::Card>,
-}
+mod util;
 
-impl Player {
-    fn change_score(&mut self, change: i8) {
-        // Move the back peg up and then the front peg forward to simulate moving the back peg
-        // forward past the front peg when the change is positive
-        if change > 0 {
-            self.back_peg_pos = self.front_peg_pos;
-            self.front_peg_pos += change as u8;
-        } else if change < 0 {
-            // TODO with score penalties for overpegging; ensure check to make sure score does not
-            // go below zero
-        }
-    }
-}
-
-// Enum for the event sent during the play phase of the game; simply a selection of the card to be
-// played or a Go if no card play is possible
-#[derive(Debug, Clone, Copy)]
-pub enum PlayTurn {
-    CardSelected(deck::Card),
-    Go,
-}
+use state_logic::cut_initial;
+use state_logic::cut_starter_and_nibs_check;
+use state_logic::deal;
+use state_logic::discard;
+use state_logic::game_start;
+use state_logic::sort;
 
 // Enum sent to the process_turn function to advance the play of the game model
 #[derive(Debug, Clone)]
 pub enum GameEvent {
     // Event containing the parameters to start the game
-    GameSetup {
-        input_player_names: Vec<String>,
-        input_manual: bool,
-        input_underscoring: bool,
-        input_muggins: bool,
-        input_overscoring: bool,
-    },
-    // Event containing a set of hand indices for each player in the game; used for selecting the
+    GameSetup(settings::GameSettings),
+    // Event containing a set of cards for each player in the game; used for selecting the
     // cards to send to the crib
-    DiscardSelection(Vec<Vec<deck::Card>>),
+    DiscardSelection(Vec<Vec<u8>>),
     // Event containing information on the card played during the play phase (either a reference to
     // a card in the player's hand or a Go)
     Play(PlayTurn),
@@ -65,6 +37,175 @@ pub enum GameEvent {
     // the program implementing this library
     Confirmation,
     Denial,
+}
+
+// The public game object with appropriate abstraction that processes GameEvents
+pub struct Game {
+    game: GameImpl,
+}
+
+impl Game {
+    pub fn new() -> Game {
+        Game {
+            game: GameImpl::new(),
+        }
+    }
+
+    // Processes the GameEvent objects to progress the model of the game
+    pub fn process_event(
+        &mut self,
+        event: GameEvent,
+    ) -> Result<game_process_return::Success, game_process_return::Error> {
+        // Simply routes the game object to the right function depending on the game state and the
+        // event passed to this function
+        match (self.game.state, event) {
+            // Accepts a GameSetup  event to continue to CutInitial
+            (GameState::GameStart, GameEvent::GameSetup(settings)) => {
+                game_start::game_setup(&mut self.game, settings)
+            }
+            (GameState::GameStart, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::GameSetup,
+            ])),
+
+            // Accepts a confirmation event indicating the players' false (still randomized, but players'
+            // confirmation does not actually choose a card) choices for cut and continues to Deal
+            (GameState::CutInitial, GameEvent::Confirmation) => {
+                cut_initial::process_cut(&mut self.game)
+            }
+            (GameState::CutInitial, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
+
+            // Deals the cards to each player after taking confirmation from dealer
+            (GameState::Deal, GameEvent::Confirmation) => deal::process_deal(&mut self.game),
+            (GameState::Deal, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
+
+            // Sorts each player's hand after confirmation allowing the player to see the order in
+            // which the cards were dealt before seeing the sorted version
+            (GameState::Sort, GameEvent::Confirmation) => sort::process_sort(&mut self.game),
+            (GameState::Sort, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
+
+            // Removes the chosen card(s) from each hand and places them in the crib
+            (GameState::Discard, GameEvent::DiscardSelection(player_discards)) => {
+                discard::process_discard(&mut self.game, player_discards)
+            }
+            (GameState::Discard, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::DiscardSelection,
+            ])),
+
+            // Reveals the starter card after confirmation of the player to the dealer's left
+            (GameState::CutStarter, GameEvent::Confirmation) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::CutStarter, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
+
+            // Processes the dealer's choice of whether or not to call nibs
+            (GameState::NibsCheck, GameEvent::Nibs(nibs_call)) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::NibsCheck, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Nibs,
+            ])),
+
+            /*
+            // Takes the input from the active player and plays it
+            (GameState::PlayWaitForCard, GameEvent::Play(play)) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::PlayWaitForCard, _) => {
+                Err(game_process_return::Error::ExpectedEvent(vec![
+                    game_process_return::Event::Play,
+                ]))
+            }
+
+            // Prepares the game for the next PlayGroup or transitions state to show phase
+            (GameState::ResetPlay, GameEvent::Confirmation) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::ResetPlay, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
+
+            // Scores the play phase of the game automatically or manually
+            (GameState::PlayScore, GameEvent::Confirmation) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::PlayScore, GameEvent::ManScoreSelection(selection)) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::PlayScore, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+                game_process_return::Event::ManScoreSelection,
+            ])),
+
+            // Processes any calls of muggins for the play phase of the game
+            (GameState::PlayMuggins, GameEvent::Confirmation) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::PlayMuggins, GameEvent::Muggins(selection)) => {
+                Err(game_process_return::Error::UnimplementedState)
+            }
+            (GameState::PlayMuggins, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+                game_process_return::Event::Muggins,
+            ])),
+            // Scores the show phase of the game automatically or manually
+            (GameState::ShowScore, GameEvent::Confirmation) => game_process_return::Error::UnimplementedState,
+            (GameState::ShowScore, GameEvent::ManScoreSelection(selection)) => game_process_return::Error::UnimplementedState,
+            (GameState::ShowScore, _) => game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+                game_process_return::Event::ManScoreSelection,
+            ]),
+
+            // Processes any call of muggins for the show phase of the game
+            (GameState::ShowMuggins, GameEvent::Confirmation) => game_process_return::Error::UnimplementedState,
+            (GameState::ShowMuggins, GameEvent::Muggins(selection)) => game_process_return::Error::UnimplementedState,
+            (GameState::ShowMuggins, _) => game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+                game_process_return::Event::Muggins,
+            ]),
+
+            // Processes the scoring of the crib automatically or manually
+            (GameState::CribScore, GameEvent::Confirmation) => game_process_return::Error::UnimplementedState,,
+            (GameState::CribScore, GameEvent::ManScoreSelection(selection)) => game_process_return::Error::UnimplementedState,
+            (GameState::CribScore, _) => game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+                game_process_return::Event::ManScoreSelection,
+            ]),
+
+            // Processes any call of muggins for the crib
+            (GameState::CribMuggins, GameEvent::Confirmation) => game_process_return::Error::UnimplementedState,
+            (GameState::CribMuggins, GameEvent::Muggins(selection)) => game_process_return::Error::UnimplementedState,
+            (GameState::CribMuggins, _) => game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+                game_process_return::Event::Muggins,
+            ]),
+
+            /* Processes the end of a game
+            (GameState::Win, GameEvent::Confirmation) => Game::win(self, true),
+            (GameState::Win, GameEvent::Denial) => Game::win(self, false),
+
+            // TODO Processes the end of a match
+            */*/
+
+            // For unexpected GameState
+            (_, _) => Err(game_process_return::Error::UnrecognizedState),
+        }
+    }
+}
+
+// Enum for the event sent during the play phase of the game; simply a selection of the card to be
+// played or a Go if no card play is possible
+#[derive(Debug, Clone, Copy)]
+pub enum PlayTurn {
+    CardSelected(deck::Card),
+    Go,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -120,319 +261,78 @@ pub struct PlayGroup {
     cards: Vec<deck::Card>,
 }
 
-// Object representing the logging of game events
-enum GameLog<T> {
-    EventInput(GameEvent),
-    StateResult {
-        name: String,
-        result: Result<String, String>,
-    },
-    WatchedVarChange {
-        name: String,
-        initial: T,
-        current: T,
-    },
-    LogOut(String),
-}
+// Game object implementation with public variables such as to allow library functions to
+// directly modify everything
+struct GameImpl {
+    // Option for when ther is no configuration during the GameStart state
+    pub settings: Option<settings::GameSettings>,
 
-// Game object which tracks game variables and processes GameEvents
-pub struct Game {
-    // Game options; given with the player names in the GameSetup event
-    is_manual_scoring: bool,
-    is_underpegging: bool,
-    is_muggins: bool,
-    is_overpegging: bool,
-
-    // Log of game events for debug purposes
-    // log: Vec<GameLog>,
-
-    // The current GameState that the game is in
     pub state: GameState,
 
-    // A vector of two to five Player objects
-    pub players: Vec<Player>,
+    pub players: Vec<player::Player>,
 
-    // The deck of cards to be used in the game; at most 25 cards are used so the deck should never
-    // run out of cards; public for debug purposes only
-    deck: deck::Deck,
+    // At most 29 cards are used so the deck should never run out of cards; public for debug
+    // purposes only
+    pub deck: deck::Deck,
 
     // The player index of the current dealer
-    pub index_dealer: u8,
+    pub index_dealer: Option<u8>,
 
     // The player index of who is currently playing or scoring
-    pub index_active: u8,
+    pub index_active: Option<u8>,
 
     // The player index of who last made a valid move while playing
-    last_player_index: u8,
+    pub last_player_index: Option<u8>,
 
-    // The card that is cut and shared by all players' hands
-    // TODO Replace with Option<deck::Card> for when the starter card has yet to be chosen
-    pub starter_card: deck::Card,
+    pub starter_card: Option<deck::Card>,
 
-    // The extra hand given to the dealer after scoring their hand
     pub crib: Vec<deck::Card>,
 
-    // The cards played during the play phase; each play group contains between 3 and 13 cards and
-    // the maximum number of cards in the play phase total is 24
+    // The cards played during the play phase; each play group contains up to 13 cards which total
+    // no more than 31
     pub play_groups: Vec<PlayGroup>,
 
     // Vector to hold the ScoreEvents remaining for muggins
-    remaining_score_events: Vec<score::ScoreEvent>,
+    pub remaining_score_events: Vec<score::ScoreEvent>,
 
     // Vector to hold the invalid ScoreEvents when overpegging is enabled
-    overpegged_score_events: Vec<score::ScoreEvent>,
+    pub overpegged_score_events: Vec<score::ScoreEvent>,
 
     // Whether to reset the play phase of the game for when a 31 score is present
-    reset_play: bool,
+    pub reset_play: bool,
+
+    // The players who are cutting for first deal; it will generally start with all players and
+    // reduce based on which players tie; if there are no ties than the player with the lowest card
+    // value is the first dealer of the game
+    pub initial_cut_between_players_with_these_indices: Vec<u8>,
 
     // When active the deck will not reset itself such that one can manually enter values into the
     // deck
     pub is_debug: bool,
 }
 
-impl Game {
-    pub fn new() -> Game {
-        Game {
+impl GameImpl {
+    pub fn new() -> GameImpl {
+        GameImpl {
             crib: Vec::new(),
-            deck: deck::new_deck(),
-            index_active: 0,
-            index_dealer: 0,
-            is_manual_scoring: false,
-            is_muggins: false,
-            is_overpegging: false,
-            is_underpegging: false,
-            last_player_index: 0,
+            deck: deck::Deck::new(),
+            index_active: None,
+            index_dealer: None,
+            last_player_index: None,
             overpegged_score_events: Vec::new(),
             play_groups: Vec::new(),
             players: Vec::new(),
             remaining_score_events: Vec::new(),
             reset_play: false,
-            starter_card: deck::Card {
-                value: deck::CardValue::Ace,
-                suit: deck::CardSuit::Spades,
-            },
+            settings: None,
+            starter_card: None,
             state: GameState::GameStart,
+            initial_cut_between_players_with_these_indices: Vec::new(),
             is_debug: false,
         }
     }
-    // Sets up the game object with the parameters given in the GameSetup event; leads to
-    // CutInitial
-    fn game_setup(
-        &mut self,
-        player_names: Vec<String>,
-        set_manual_scoring: bool,
-        set_underpegging: bool,
-        set_muggins: bool,
-        set_overpegging: bool,
-    ) -> Result<&str, &str> {
-        // Checks that number of players is valid
-        if player_names.len() > 5 || player_names.len() < 2 {
-            return Err("Expected GameSetup with 2 to 5 player names");
-        }
 
-        // Checks that the options set are valid eg. that set_manual_scoring is true when
-        // set_allow_underpegging is true
-        if set_underpegging && !set_manual_scoring {
-            return Err("Manual scoring must be enabled for underpegging to be enabled");
-        }
-
-        if set_muggins && (!set_manual_scoring || !set_underpegging) {
-            return Err(
-                "Manual scoring and underpegging must be enabled for muggins to be enabled",
-            );
-        }
-
-        if set_overpegging && !set_manual_scoring {
-            return Err("Manual scoring must be enabled for overpegging to be enabled");
-        }
-
-        // Sets game parameters
-        self.is_manual_scoring = set_manual_scoring;
-        self.is_underpegging = set_underpegging;
-        self.is_overpegging = set_overpegging;
-        self.is_muggins = set_muggins;
-
-        // Creates vector of player objects to be used in game
-        self.players = Vec::new();
-        for name in player_names {
-            self.players.push(Player {
-                username: name,
-                back_peg_pos: 0,
-                front_peg_pos: 0,
-                hand: Vec::with_capacity(6),
-            })
-        }
-
-        self.deck = deck::new_deck();
-        self.crib = Vec::with_capacity(4);
-
-        // Creates empty vector of PlayGroups and pushes an empty PlayGroup
-        self.play_groups = Vec::with_capacity(5);
-        self.play_groups.push(PlayGroup {
-            cards: Vec::new(),
-            total: 0,
-        });
-
-        self.state = GameState::CutInitial;
-        Ok("Received valid GameSetup event")
-    }
-
-    // Processes the cut phase determining the first dealer after confirmation; leads to Deal
-    fn process_cut(&mut self) -> Result<&str, &str> {
-        // Start with shuffled deck; disabled in debug mode for manual editing of deck
-        if !self.is_debug {
-            self.deck.reset_deck();
-        }
-
-        // Deal one card to each player
-        for player in &mut self.players {
-            player.hand.clear();
-            player.hand.push(self.deck.deal());
-        }
-
-        // Compare values of each player's card
-        let mut lowest_value = 14;
-        let mut player_indices_of_lowest_value = Vec::with_capacity(4);
-        for (index, player) in self.players.iter().enumerate() {
-            // Find value of given card
-            let card_value = deck::return_value(player.hand[0]);
-            // If card is the new lowest card, change lowest_value and make that player's index the
-            // only member of player_indices_of_lowest_value
-            if card_value < lowest_value {
-                lowest_value = card_value;
-                player_indices_of_lowest_value = Vec::new();
-                player_indices_of_lowest_value.push(index);
-            }
-            // Else if the card is tied for lowest, add that player's index to
-            // player_indices_of_lowest_value
-            else if card_value == lowest_value {
-                player_indices_of_lowest_value.push(index);
-            }
-        }
-
-        // If the lowest value occurs twice, do not change the state
-        if player_indices_of_lowest_value.len() > 1 {
-            if !self.is_debug {
-                self.deck.reset_deck();
-            }
-            return Ok("Cut resulted in tie; redoing");
-        }
-        // Else change the dealer to the correct player index and change the state
-        // Unwrap should never fail as highest index is three
-        self.index_dealer = TryFrom::try_from(player_indices_of_lowest_value[0]).unwrap();
-        self.state = GameState::Deal;
-        Ok("First dealer chosen with cut")
-    }
-
-    // Deals the cards to each player's hand after confirmation call from the dealer; leads to Sort
-    fn process_deal(&mut self) -> Result<&str, &str> {
-        // Starts with shuffled deck
-        if !self.is_debug {
-            self.deck.reset_deck();
-        }
-
-        // Removes cards from the cut or the previous hand
-        for player in &mut self.players {
-            player.hand.clear();
-        }
-
-        // With two players, each player is dealt six cards; with three or four players, each
-        // player is dealt five cards; with five players, five cards are dealt to everyone, but the
-        // dealer who gets four
-        if self.players.len() == 2 {
-            for _i in 0..6 {
-                for player in &mut self.players {
-                    player.hand.push(self.deck.deal());
-                }
-            }
-        } else if self.players.len() <= 4 {
-            for _i in 0..5 {
-                for player in &mut self.players {
-                    player.hand.push(self.deck.deal());
-                }
-            }
-        } else {
-            for i in 0..5 {
-                for (index, player) in &mut self.players.iter_mut().enumerate() {
-                    // Excludes the dealer from being dealt a fifth card
-                    if i != 4 || self.index_dealer != index as u8 {
-                        player.hand.push(self.deck.deal());
-                    }
-                }
-            }
-        }
-
-        self.state = GameState::Sort;
-        Ok("Dealt cards to each player")
-    }
-
-    // Sorts each player's hand; separate from process_deal such as to allow the player to see the
-    // order in which the cards were dealt before seeing the organized hand; leads to Discard
-    fn sort_hand(&mut self) -> Result<&str, &str> {
-        for player in &mut self.players {
-            player.hand.sort();
-        }
-
-        self.state = GameState::Discard;
-        Ok("Organized hands of each player")
-    }
-
-    // Places the cards in the selected discards into the crib; leads to CutStarter
-    // Order of vector of discards match the order of the players vector
-    fn process_discard(&mut self, player_discards: Vec<Vec<deck::Card>>) -> Result<&str, &str> {
-        // Resets the crib vector to prevent extra cards
-        self.crib.clear();
-
-        // For every player's hand
-        if player_discards.len() != self.players.len() {
-            return Err("There must be a discard vector for every player");
-        }
-        for (player_index, discards) in player_discards.iter().enumerate() {
-            // Check that number of discarded cards is correct
-            if self.players.len() == 2 {
-                if discards.len() != 2 {
-                    return Err("Improper number of discarded cards; with two players, two cards are discarded");
-                }
-            } else if self.players.len() <= 4 {
-                if discards.len() != 1 {
-                    return Err("Improper number of discarded cards; with three of four players, one card is discarded");
-                }
-            } else {
-                if (player_index == self.index_dealer as usize && discards.len() != 0)
-                    || (player_index != self.index_dealer as usize && discards.len() != 1)
-                {
-                    return Err("Improper number of discarded cards; with five players, one card is discarded by everyone but the dealer");
-                }
-            }
-
-            // Removes the card elements matching the discards from the player's hand
-            self.players[player_index].hand.retain({
-                |&card_hand| {
-                    let mut is_card_in_discards = false;
-                    for card_discard in discards {
-                        if *card_discard == card_hand {
-                            is_card_in_discards = true;
-                        }
-                    }
-                    !is_card_in_discards
-                }
-            });
-
-            // Add the discards to the crib
-            for card in discards {
-                self.crib.push(*card);
-            }
-        }
-
-        // Adds a card from the deck when the number of players is three
-        if self.players.len() == 3 {
-            self.crib.push(self.deck.deal());
-        }
-
-        self.state = GameState::CutStarter;
-        Ok("Processed players' discards")
-    }
-
+    /*
     // Initializes the variables used in the PlayWaitForCard state; function implemented in
     // NibsCheck when is_manual_scoring or in CutStarter otherwise
     fn ready_for_play(&mut self) {
@@ -461,7 +361,7 @@ impl Game {
 
                 //If the score is not 121 or higher
                 Game::ready_for_play(self);
-                return Ok("Starter card cut; nib");
+                return Ok("Starter card cut; nibs");
             }
 
             // If the cut was not a jack, but automatic scoring is still disabled
@@ -984,46 +884,48 @@ impl Game {
     }
 
     // Processes the GameEvent objects to progress the model of the game
-    pub fn process_event(&mut self, event: GameEvent) -> Result<&str, &str> {
+    pub fn process_event(
+        &mut self,
+        event: GameEvent,
+    ) -> Result<game_process_return::Success, game_process_return::Error> {
+        // Simply routes the game object to the right function depending on the game state and the
+        // event passed to this function
         match (self.state, event) {
-            // Accepts a GameSetip  event to continue to CutShuffleAndDeal
-            (
-                GameState::GameStart,
-                GameEvent::GameSetup {
-                    input_player_names,
-                    input_manual,
-                    input_underscoring,
-                    input_muggins,
-                    input_overscoring,
-                },
-            ) => Game::game_setup(
-                self,
-                input_player_names,
-                input_manual,
-                input_underscoring,
-                input_muggins,
-                input_overscoring,
-            ),
-            (GameState::GameStart, _) => Err("Expected GameSetup event to GameStart"),
+            // Accepts a GameSetup  event to continue to CutInitial
+            (GameState::GameStart, GameEvent::GameSetup(settings)) => {
+                game_start::game_setup(self, settings)
+            }
+            (GameState::GameStart, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::GameSetup,
+            ])),
 
-            // Accepts a confirmation event indicating the players' false choices for cut
-            (GameState::CutInitial, GameEvent::Confirmation) => Game::process_cut(self),
-            (GameState::CutInitial, _) => Err("Expected Confirmation event to CutInitial"),
+            // Accepts a confirmation event indicating the players' false (still randomized, but players'
+            // confirmation does not actually choose a card) choices for cut and continues to Deal
+            (GameState::CutInitial, GameEvent::Confirmation) => cut_initial::process_cut(self),
+            (GameState::CutInitial, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
 
-            // Deals the cards to each player taking confirmation from dealer
-            (GameState::Deal, GameEvent::Confirmation) => Game::process_deal(self),
-            (GameState::Deal, _) => Err("Expected Confirmation event to Deal"),
+            // Deals the cards to each player after taking confirmation from dealer
+            (GameState::Deal, GameEvent::Confirmation) => deal::process_deal(self),
+            (GameState::Deal, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
 
-            // Sorts each player's hand after allowing the player to see the order in which the
-            // cards were dealt
-            (GameState::Sort, GameEvent::Confirmation) => Game::sort_hand(self),
-            (GameState::Sort, _) => Err("Expected Confirmation event to Sort"),
+            // Sorts each player's hand after confirmation allowing the player to see the order in
+            // which the cards were dealt before seeing the sorted version
+            (GameState::Sort, GameEvent::Confirmation) => sort::process_sort(self),
+            (GameState::Sort, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::Confirmation,
+            ])),
 
             // Removes the chosen card(s) from each hand and places them in the crib
             (GameState::Discard, GameEvent::DiscardSelection(player_discards)) => {
-                Game::process_discard(self, player_discards)
+                discard::process_discard(self, player_discards)
             }
-            (GameState::Discard, _) => Err("Expected HandIndices event to Discard"),
+            (GameState::Discard, _) => Err(game_process_return::Error::ExpectedEvent(vec![
+                game_process_return::Event::DiscardSelection,
+            ])),
 
             // Reveals the starter card after confirmation of the player to the dealer's left
             (GameState::CutStarter, GameEvent::Confirmation) => Game::process_starter(self),
@@ -1105,4 +1007,5 @@ impl Game {
             (_, _) => Err("Unrecognized GameState"),
         }
     }
+    */
 }

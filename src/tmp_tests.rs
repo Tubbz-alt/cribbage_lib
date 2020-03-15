@@ -1,56 +1,6 @@
-use std::char;
-
-// Returns a card object based on a specified value and suit character for the purpose of
-// testing
-fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
-    let set_value: super::deck::CardValue = match set_value {
-        'A' => super::deck::CardValue::Ace,
-        '2' => super::deck::CardValue::Two,
-        '3' => super::deck::CardValue::Three,
-        '4' => super::deck::CardValue::Four,
-        '5' => super::deck::CardValue::Five,
-        '6' => super::deck::CardValue::Six,
-        '7' => super::deck::CardValue::Seven,
-        '8' => super::deck::CardValue::Eight,
-        '9' => super::deck::CardValue::Nine,
-        'T' => super::deck::CardValue::Ten,
-        'J' => super::deck::CardValue::Jack,
-        'Q' => super::deck::CardValue::Queen,
-        'K' => super::deck::CardValue::King,
-        _ => panic!("Unexpexted value in return_card()"),
-    };
-
-    let set_suit: super::deck::CardSuit = match set_suit {
-        'H' => super::deck::CardSuit::Hearts,
-        'D' => super::deck::CardSuit::Diamonds,
-        'C' => super::deck::CardSuit::Clubs,
-        'S' => super::deck::CardSuit::Spades,
-        _ => panic!("Unexpected suit in return_card()"),
-    };
-
-    super::deck::Card {
-        value: set_value,
-        suit: set_suit,
-    }
-}
-
+/*
 // Return a basic game with a specified length and debug status
 fn return_basic_game(len: u8, debug: bool) -> super::Game {
-    let mut names = Vec::new();
-    if len >= 2 {
-        names.push("Alice".to_string());
-        names.push("Bob".to_string());
-    }
-    if len >= 3 {
-        names.push("Carol".to_string());
-    }
-    if len >= 4 {
-        names.push("Dan".to_string());
-    }
-    if len == 5 {
-        names.push("Erin".to_string());
-    }
-
     let mut game = super::Game::new();
     if debug {
         game.is_debug = true;
@@ -109,15 +59,6 @@ fn game_setup(
     game.index_active = 1;
 
     game
-}
-
-#[test]
-fn deck_test() {
-    let mut deck = super::deck::new_deck();
-    deck.reset_deck();
-    let first_deck = deck.clone();
-    deck.reset_deck();
-    assert!(deck != first_deck);
 }
 
 #[test]
@@ -2009,3 +1950,4 @@ fn show_manual_test() {
     assert_eq!(game.players[1].front_peg_pos, 13);
     assert_eq!(game.players[0].front_peg_pos, 27);
 }
+*/
