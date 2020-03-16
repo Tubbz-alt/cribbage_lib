@@ -179,6 +179,11 @@ pub struct Deck {
 }
 
 impl Deck {
+    // Returns a Deck from a given deck of cards for debug purposes
+    pub(crate) fn from_vec(cards: Vec<Card>) -> Deck {
+        Deck { card_vector: cards }
+    }
+
     pub fn new() -> Deck {
         let mut deck = Deck {
             card_vector: Vec::new(),

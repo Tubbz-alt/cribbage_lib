@@ -2,9 +2,10 @@ use std::char;
 
 // Returns a card object based on a specified value and suit character for the purpose of
 // testing
-pub fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
+pub(crate) fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
     let set_value: super::deck::CardValue = match set_value {
         'A' => super::deck::CardValue::Ace,
+        '1' => super::deck::CardValue::Ace,
         '2' => super::deck::CardValue::Two,
         '3' => super::deck::CardValue::Three,
         '4' => super::deck::CardValue::Four,
@@ -31,5 +32,33 @@ pub fn return_card(set_value: char, set_suit: char) -> super::deck::Card {
     super::deck::Card {
         value: set_value,
         suit: set_suit,
+    }
+}
+
+// Returns a list of all possible rule variants for the purpose of testing
+pub(crate) fn return_variants() -> Vec<super::settings::RuleVariant> {
+    vec![
+        super::settings::RuleVariant::TwoStandard,
+        super::settings::RuleVariant::TwoFiveCard,
+        super::settings::RuleVariant::ThreeStandard,
+        super::settings::RuleVariant::ThreeCaptain,
+        super::settings::RuleVariant::FourIndividual,
+        super::settings::RuleVariant::FourPairs,
+        super::settings::RuleVariant::FiveStandard,
+        super::settings::RuleVariant::SixPairs,
+    ]
+}
+
+// Returns a u8 with the number of players for a given rule variant
+pub(crate) fn return_num_players_for_variant(variant: super::settings::RuleVariant) -> u8 {
+    match variant {
+        crate::settings::RuleVariant::TwoStandard => 2,
+        crate::settings::RuleVariant::TwoFiveCard => 2,
+        crate::settings::RuleVariant::ThreeStandard => 3,
+        crate::settings::RuleVariant::ThreeCaptain => 3,
+        crate::settings::RuleVariant::FourIndividual => 4,
+        crate::settings::RuleVariant::FourPairs => 4,
+        crate::settings::RuleVariant::FiveStandard => 5,
+        crate::settings::RuleVariant::SixPairs => 6,
     }
 }

@@ -56,17 +56,7 @@ mod test {
     // variant, or when the victor_dealer_option is LastPlaceIsDealer when the variant is ThreeCaptain
     #[test]
     fn settings_validity_vdo() {
-        let variants = vec![
-            crate::settings::RuleVariant::TwoStandard,
-            crate::settings::RuleVariant::TwoFiveCard,
-            crate::settings::RuleVariant::ThreeStandard,
-            crate::settings::RuleVariant::ThreeCaptain,
-            crate::settings::RuleVariant::FourIndividual,
-            crate::settings::RuleVariant::FourPairs,
-            crate::settings::RuleVariant::FiveStandard,
-            crate::settings::RuleVariant::SixPairs,
-        ];
-
+        let variants = crate::util::return_variants();
         let victor_dealer_options = vec![
             crate::settings::VictorDealerOption::LastPlaceIsDealer,
             crate::settings::VictorDealerOption::LosersDrawForDealer,
