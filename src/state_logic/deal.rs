@@ -2,6 +2,162 @@ use crate as game;
 use crate::deck;
 use crate::game_process_return;
 
+#[cfg(test)]
+mod test {
+
+    fn set_up_game(variant: crate::settings::RuleVariant) -> crate::GameImpl {
+        let mut game = crate::GameImpl::new();
+        game.is_debug = true;
+
+        let vdo = match variant {
+            crate::settings::RuleVariant::TwoStandard => {
+                crate::settings::VictorDealerOption::TwoPlayers
+            }
+            crate::settings::RuleVariant::TwoFiveCard => {
+                crate::settings::VictorDealerOption::TwoPlayers
+            }
+            _ => crate::settings::VictorDealerOption::LosersDrawForDealer,
+        };
+
+        let settings = crate::settings::GameSettings {
+            variant: variant,
+            victor_dealer_option: vdo,
+            is_manual_scoring: false,
+            is_underpegging: false,
+            is_muggins: false,
+            is_overpegging: false,
+            is_lowball: false,
+        };
+
+        crate::state_logic::game_start::game_setup(&mut game, settings).unwrap();
+
+        game.deck = crate::deck::Deck::new();
+
+        crate::state_logic::cut_initial::process_cut(&mut game).unwrap();
+
+        game.deck = crate::deck::Deck::new();
+
+        game
+    }
+
+    #[test]
+    fn process_deal_two_six_card() {
+        let mut game = set_up_game(crate::settings::RuleVariant::TwoStandard);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 6);
+        assert_eq!(game.players[1].hand.len(), 6);
+    }
+
+    #[test]
+    fn process_deal_two_five_card() {
+        let mut game = set_up_game(crate::settings::RuleVariant::TwoFiveCard);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 5);
+        assert_eq!(game.players[1].hand.len(), 5);
+    }
+
+    #[test]
+    fn process_deal_three_players() {
+        let mut game = set_up_game(crate::settings::RuleVariant::ThreeStandard);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 5);
+        assert_eq!(game.players[1].hand.len(), 5);
+        assert_eq!(game.players[2].hand.len(), 5);
+        assert_eq!(game.crib.len(), 1);
+
+        let mut game = set_up_game(crate::settings::RuleVariant::ThreeCaptain);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 5);
+        assert_eq!(game.players[1].hand.len(), 5);
+        assert_eq!(game.players[2].hand.len(), 5);
+        assert_eq!(game.crib.len(), 1);
+    }
+
+    #[test]
+    fn process_deal_four_players() {
+        let mut game = set_up_game(crate::settings::RuleVariant::FourIndividual);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 5);
+        assert_eq!(game.players[1].hand.len(), 5);
+        assert_eq!(game.players[2].hand.len(), 5);
+        assert_eq!(game.players[3].hand.len(), 5);
+
+        let mut game = set_up_game(crate::settings::RuleVariant::FourPairs);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 5);
+        assert_eq!(game.players[1].hand.len(), 5);
+        assert_eq!(game.players[2].hand.len(), 5);
+        assert_eq!(game.players[3].hand.len(), 5);
+    }
+
+    #[test]
+    fn process_deal_five_card() {
+        // Dealer in the game returned to this function is index 0
+        let mut game = set_up_game(crate::settings::RuleVariant::FiveStandard);
+
+        println!("{:?}", game.index_dealer);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 4);
+        assert_eq!(game.players[1].hand.len(), 5);
+        assert_eq!(game.players[2].hand.len(), 5);
+        assert_eq!(game.players[3].hand.len(), 5);
+        assert_eq!(game.players[4].hand.len(), 5);
+    }
+
+    #[test]
+    fn process_deal_six_card() {
+        // Dealer index is 0, and the dealer's partner index is 3
+        let mut game = set_up_game(crate::settings::RuleVariant::SixPairs);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 4);
+        assert_eq!(game.players[1].hand.len(), 5);
+        assert_eq!(game.players[2].hand.len(), 5);
+        assert_eq!(game.players[3].hand.len(), 4);
+        assert_eq!(game.players[4].hand.len(), 5);
+        assert_eq!(game.players[5].hand.len(), 5);
+    }
+}
+
 pub(crate) fn process_deal(
     game: &mut game::GameImpl,
 ) -> Result<game_process_return::Success, game_process_return::Error> {

@@ -48,6 +48,8 @@ mod test {
 
         game.initial_cut_between_players_with_these_indices = indices;
 
+        game.deck = crate::deck::Deck::new();
+
         game
     }
 
