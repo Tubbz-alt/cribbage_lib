@@ -1,4 +1,3 @@
-use crate as game;
 use crate::deck;
 use crate::game_process_return;
 use crate::player;
@@ -186,7 +185,7 @@ mod test {
 }
 
 pub(crate) fn process_cut(
-    game: &mut game::GameImpl,
+    game: &mut crate::GameImpl,
 ) -> Result<game_process_return::Success, game_process_return::Error> {
     // Start with a shuffled deck by default or whatever the existing deck is when in debug mode
     if !game.is_debug {
@@ -222,7 +221,7 @@ pub(crate) fn process_cut(
     }
 }
 
-fn set_dealer(index: u8, game: &mut game::GameImpl) -> game_process_return::Success {
+fn set_dealer(index: u8, game: &mut crate::GameImpl) -> game_process_return::Success {
     game.index_dealer = Some(index);
     // If the rules variant is TwoFiveCard, then award the loser of the cut three points
     if let Some(settings) = game.settings {
@@ -234,11 +233,11 @@ fn set_dealer(index: u8, game: &mut game::GameImpl) -> game_process_return::Succ
             }
         }
     }
-    game.state = game::GameState::Deal;
+    game.state = crate::GameState::Deal;
     game_process_return::Success::InitialCut(game_process_return::InitialCutReturn::DealerChosen)
 }
 
-fn deal_card_to_valid_players(game: &mut game::GameImpl) {
+fn deal_card_to_valid_players(game: &mut crate::GameImpl) {
     for (index, player) in game.players.iter_mut().enumerate() {
         player.hand.clear();
 

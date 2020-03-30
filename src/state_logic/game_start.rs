@@ -1,4 +1,3 @@
-use crate as game;
 use crate::game_process_return;
 use crate::player;
 
@@ -328,8 +327,8 @@ mod test {
 }
 
 pub(crate) fn game_setup(
-    game: &mut game::GameImpl,
-    settings: game::settings::GameSettings,
+    game: &mut crate::GameImpl,
+    settings: crate::settings::GameSettings,
 ) -> Result<game_process_return::Success, game_process_return::Error> {
     // If the settings are invalid, return the error given, otherwise set the game settings to the
     // given settings
@@ -350,18 +349,18 @@ pub(crate) fn game_setup(
             .push(index as u8);
     }
 
-    game.state = game::GameState::CutInitial;
+    game.state = crate::GameState::CutInitial;
 
     Ok(game_process_return::Success::GameStart)
 }
 
 fn check_settings_validity(
-    settings: game::settings::GameSettings,
+    settings: crate::settings::GameSettings,
 ) -> Result<(), game_process_return::Error> {
     // If the variant is one of the two player variants but the VictorDealerOption isn't TwoPlayers
-    if (settings.variant == game::settings::RuleVariant::TwoStandard
-        || settings.variant == game::settings::RuleVariant::TwoFiveCard)
-        && settings.victor_dealer_option != game::settings::VictorDealerOption::TwoPlayers
+    if (settings.variant == crate::settings::RuleVariant::TwoStandard
+        || settings.variant == crate::settings::RuleVariant::TwoFiveCard)
+        && settings.victor_dealer_option != crate::settings::VictorDealerOption::TwoPlayers
     {
         return Err(game_process_return::Error::GameStartInvalidConfig(
             game_process_return::ConfigError::VDOIsNotTwoPlayersWhenVariantIsTwoPlayers,
@@ -369,9 +368,9 @@ fn check_settings_validity(
     }
 
     // If the variant is three or more players but the VictorDealerOption is TwoPlayers
-    if settings.variant != game::settings::RuleVariant::TwoStandard
-        && settings.variant != game::settings::RuleVariant::TwoFiveCard
-        && settings.victor_dealer_option == game::settings::VictorDealerOption::TwoPlayers
+    if settings.variant != crate::settings::RuleVariant::TwoStandard
+        && settings.variant != crate::settings::RuleVariant::TwoFiveCard
+        && settings.victor_dealer_option == crate::settings::VictorDealerOption::TwoPlayers
     {
         return Err(game_process_return::Error::GameStartInvalidConfig(
             game_process_return::ConfigError::VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers,
@@ -380,8 +379,8 @@ fn check_settings_validity(
 
     // If the variant is ThreeCaptain then do not allow the victor_dealer_option to be
     // LastPlaceIsDealer because the partners change so the losers should always draw for first crib
-    if settings.variant == game::settings::RuleVariant::ThreeCaptain
-        && settings.victor_dealer_option == game::settings::VictorDealerOption::LastPlaceIsDealer
+    if settings.variant == crate::settings::RuleVariant::ThreeCaptain
+        && settings.victor_dealer_option == crate::settings::VictorDealerOption::LastPlaceIsDealer
     {
         return Err(game_process_return::Error::GameStartInvalidConfig(
             game_process_return::ConfigError::VDOIsNotLoserDrawsForDealerWhenVariantIsThreeCaptain,
@@ -391,7 +390,7 @@ fn check_settings_validity(
     // If the variant is Captain's Cribbage, then it doesn't really work with lowball; maybe change
     // this in the future but it really seems like the pair has a real advantage were this
     // configuration allowed
-    if settings.variant == game::settings::RuleVariant::ThreeCaptain && settings.is_lowball {
+    if settings.variant == crate::settings::RuleVariant::ThreeCaptain && settings.is_lowball {
         return Err(game_process_return::Error::GameStartInvalidConfig(
             game_process_return::ConfigError::LowballEnabledWhenVariantIsThreeCaptain,
         ));
@@ -425,17 +424,17 @@ fn check_settings_validity(
     Ok(())
 }
 
-fn set_up_players(game: &mut game::GameImpl) {
+fn set_up_players(game: &mut crate::GameImpl) {
     if let Some(settings) = game.settings {
         game.players = match settings.variant {
-            game::settings::RuleVariant::TwoStandard => set_up_no_partners(2),
-            game::settings::RuleVariant::TwoFiveCard => set_up_no_partners(2),
-            game::settings::RuleVariant::ThreeStandard => set_up_no_partners(3),
-            game::settings::RuleVariant::ThreeCaptain => set_up_three_captain(),
-            game::settings::RuleVariant::FourIndividual => set_up_no_partners(4),
-            game::settings::RuleVariant::FourPairs => set_up_four_pairs(),
-            game::settings::RuleVariant::FiveStandard => set_up_no_partners(5),
-            game::settings::RuleVariant::SixPairs => set_up_six_pairs(),
+            crate::settings::RuleVariant::TwoStandard
+            | crate::settings::RuleVariant::TwoFiveCard => set_up_no_partners(2),
+            crate::settings::RuleVariant::ThreeStandard => set_up_no_partners(3),
+            crate::settings::RuleVariant::ThreeCaptain => set_up_three_captain(),
+            crate::settings::RuleVariant::FourIndividual => set_up_no_partners(4),
+            crate::settings::RuleVariant::FourPairs => set_up_four_pairs(),
+            crate::settings::RuleVariant::FiveStandard => set_up_no_partners(5),
+            crate::settings::RuleVariant::SixPairs => set_up_six_pairs(),
         };
     }
 }

@@ -37,11 +37,26 @@ pub enum DiscardError {
     TwoCardIndicesMayNotBeRepeated(u8),
     IndicesAreBetween0And5InclusiveWithTwoStandard(u8),
     IndicesAreBetween0And4InclusiveWithTwoFiveCard(u8),
-    IndicesAreBetween0And4InclusiveWithThreeOrMoreCards(u8),
+    IndicesAreBetween0And4InclusiveWithThreeOrMorePlayers(u8),
+}
+
+// These are errors that only programmers implementing a front end to the library should see. They
+// are things that will only appear from their errors, not a regular part of player input being
+// handled.
+#[derive(Debug, PartialEq)]
+pub enum ImplError {
+    // If you're using the public interface this should never occur, this error is returned when
+    // there if the GameImpl's settings variable is None.
+    NoConfig,
+    // When creating the DiscardSelection(Vec<Vec<u8>>) event to be sent to the game, the outer
+    // vector should have one Vec<u8> per player even if that inner Vec<u8> is empty such as with
+    // the dealer in the five or six card variations
+    ThereShouldBeOneDiscardIndicesVectorPerPlayer,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    ImplementationError(ImplError),
     ExpectedEvent(Vec<Event>),
     GameStartInvalidConfig(ConfigError),
     InitialCutError,
