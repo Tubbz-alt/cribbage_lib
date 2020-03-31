@@ -30,6 +30,8 @@ pub enum GameEvent {
     ManScoreSelection(Option<Vec<score::ScoreEvent>>),
     // Event for whether the dealer calls nibs
     Nibs(Option<score::ScoreEvent>),
+    // Event for contesting a player who overscores (or underscores in lowball)
+    Contest(Option<score::ScoreEvent>),
     // Event for whether a player calls muggins
     Muggins(Option<Vec<score::ScoreEvent>>),
     // Simple event for continuing to the next game state; used when player input is needed such as
@@ -99,15 +101,16 @@ impl Game {
 
             // Reveals the starter card after confirmation of the player to the dealer's left
             (GameState::CutStarter, GameEvent::Confirmation) => {
-                Err(game_process_return::Error::UnimplementedState)
+                cut_starter_and_nibs_check::process_cut(&mut self.game)
             }
             (GameState::CutStarter, _) => Err(game_process_return::Error::ExpectedEvent(vec![
                 game_process_return::Event::Confirmation,
             ])),
 
-            // Processes the dealer's choice of whether or not to call nibs
+            // Processes the dealer's choice of whether or not to call nibs when underpegging is
+            // disabled
             (GameState::NibsCheck, GameEvent::Nibs(nibs_call)) => {
-                Err(game_process_return::Error::UnimplementedState)
+                cut_starter_and_nibs_check::process_nibs(&mut self.game, nibs_call)
             }
             (GameState::NibsCheck, _) => Err(game_process_return::Error::ExpectedEvent(vec![
                 game_process_return::Event::Nibs,
@@ -225,14 +228,24 @@ pub enum GameState {
     // Determines whether the dealer should receive points after calling or failing to call nibs
     // with the Nibs event; muggins does not apply for nibs so there is no muggins state here
     NibsCheck,
+    // Determines whether somebody contests the nibs call; this succeeds if the dealer calls nibs
+    // when there is not a jack or if the dealer did not call nibs when there is a jack in lowball
+    // mode
+    NibsContest,
     // Deals with the process of playing a single card received with a Play event
     PlayWaitForCard,
     // Deals with the scoring of the last card to be played in the PlayGroup automatically with a
     // Confirmation event or manually with a ManScoreSelection event
     PlayScore,
+    // Deals with whhether somebody contests any of the ScoreEvents processed in the PlayScore
+    // state; this succeeds if the active player overpegs or if the active player underpegs in
+    // lowball
+    PlayContest,
     // Deals with the calling of muggins of the last card to be played in the PlayGroup with a
     // Muggins event
     PlayMuggins,
+    // Deals with contesting a muggins call when overpegging is enabled
+    PlayMugginsContest,
     // Handles the creation of a new PlayGroup or the transition to the ShowScore state after the
     // play of cards is no longer possible for the current PlayGroup
     ResetPlay,

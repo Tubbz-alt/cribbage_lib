@@ -54,7 +54,7 @@ pub enum ScoreType {
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct ScoreEvent {
     pub score_type: ScoreType,
-    pub player_index: usize,
+    pub player_index: u8,
     pub point_value: u8,
 }
 
@@ -73,7 +73,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
         score_of_play.push(ScoreEvent {
             score_type: ScoreType::Play(PlayScoreType::Fifteen),
             point_value: 2,
-            player_index: index,
+            player_index: index as u8,
         });
     }
     // 2pts for bringing the PlayGroup to exactly 31
@@ -81,7 +81,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
         score_of_play.push(ScoreEvent {
             score_type: ScoreType::Play(PlayScoreType::ThirtyOne),
             point_value: 2,
-            player_index: index,
+            player_index: index as u8,
         });
     }
 
@@ -104,13 +104,13 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
             // Array of bools indicating whether a given card value is present in the search
             let mut is_value_present = [false; 13];
 
-            // For each card in the last index_offset elements of the PlayGroup's cards vector
+            // For each card in the last index as u8_offset elements of the PlayGroup's cards vector
             for card in &current_group.cards[start_position..] {
                 // Set the bool located at the position represented by the cards value to true
                 is_value_present[(deck::return_value(*card) as usize) - 1] = true;
             }
 
-            // See if the is_value_present array has a continuous section of index_offset true
+            // See if the is_value_present array has a continuous section of index as u8_offset true
             // values
             let mut num_continuous_values: u8 = 0;
             let mut max_num_continuous_values: u8 = 0;
@@ -128,13 +128,13 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
             }
 
             // If the number of continuous values is the number of values searched then a run
-            // of length index_offset cards is present in play; add that run value to the
+            // of length index as u8_offset cards is present in play; add that run value to the
             // score_of_play vector and break from the loop to not double-count runs
             if max_num_continuous_values as usize == index_offset {
                 score_of_play.push(ScoreEvent {
                     score_type: ScoreType::Play(PlayScoreType::Straight(max_num_continuous_values)),
                     point_value: max_num_continuous_values,
-                    player_index: index,
+                    player_index: index as u8,
                 });
                 break;
             }
@@ -160,7 +160,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
             // last 4, 3, or 2 cards
             let starting_index = current_group.cards.len() - index_offset;
 
-            // For each card in the PlayGroup from the starting index (the length minus 4, 3,
+            // For each card in the PlayGroup from the starting index as u8 (the length minus 4, 3,
             // or 2) and the end of the
             for card in &current_group.cards[starting_index..] {
                 // If the value is not consistent, mark it as such
@@ -173,7 +173,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
                         score_of_play.push(ScoreEvent {
                             score_type: ScoreType::Play(PlayScoreType::Quadruple),
                             point_value: 12,
-                            player_index: index,
+                            player_index: index as u8,
                         });
                     } else if index_offset == 3 {
                         let mut is_quadruple = false;
@@ -186,7 +186,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
                             score_of_play.push(ScoreEvent {
                                 score_type: ScoreType::Play(PlayScoreType::Triple),
                                 point_value: 6,
-                                player_index: index,
+                                player_index: index as u8,
                             });
                         }
                     } else if index_offset == 2 {
@@ -202,7 +202,7 @@ pub fn play_score(index: usize, current_group: &crate::PlayGroup) -> Vec<ScoreEv
                             score_of_play.push(ScoreEvent {
                                 score_type: ScoreType::Play(PlayScoreType::Pair),
                                 point_value: 2,
-                                player_index: index,
+                                player_index: index as u8,
                             });
                         }
                     }
@@ -346,7 +346,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                     max_tuple_length = 2;
                 }
                 found_scores.push(ScoreEvent {
-                    player_index: index as usize,
+                    player_index: index,
                     point_value: 2,
                     score_type: ScoreType::Show(ShowScoreType::Pair(combination.to_vec())),
                 });
@@ -357,7 +357,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                         max_tuple_length = 3;
                     }
                     found_scores.push(ScoreEvent {
-                        player_index: index as usize,
+                        player_index: index,
                         point_value: 6,
                         score_type: ScoreType::Show(ShowScoreType::Triple(combination.to_vec())),
                     });
@@ -366,7 +366,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                         max_tuple_length = 4;
                     }
                     found_scores.push(ScoreEvent {
-                        player_index: index as usize,
+                        player_index: index,
                         point_value: 12,
                         score_type: ScoreType::Show(ShowScoreType::Quadruple(combination.to_vec())),
                     });
@@ -393,7 +393,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
                 cards_of_runs_four_or_higher.push(combination.to_vec());
             }
             found_scores.push(ScoreEvent {
-                player_index: index as usize,
+                player_index: index,
                 point_value: combination.len() as u8,
                 score_type: ScoreType::Show(ShowScoreType::Straight(combination.to_vec())),
             });
@@ -402,7 +402,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
         // If the sum is 15
         if sum == 15 {
             found_scores.push(ScoreEvent {
-                player_index: index as usize,
+                player_index: index,
                 point_value: 2,
                 score_type: ScoreType::Show(ShowScoreType::Fifteen(combination.to_vec())),
             });
@@ -484,7 +484,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
             nobs.push(starter);
             nobs.sort();
             found_scores.push(ScoreEvent {
-                player_index: index as usize,
+                player_index: index,
                 point_value: 1,
                 score_type: ScoreType::Show(ShowScoreType::Nobs(nobs)),
             });
@@ -510,7 +510,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
     if num_matching_cards == 4 {
         hand.sort();
         found_scores.push(ScoreEvent {
-            player_index: index as usize,
+            player_index: index,
             point_value: 4,
             score_type: ScoreType::Show(ShowScoreType::FourFlush(hand)),
         });
@@ -524,7 +524,7 @@ pub fn score_hand(index: u8, mut hand: Vec<deck::Card>, starter: deck::Card) -> 
         all_cards.sort();
 
         found_scores.push(ScoreEvent {
-            player_index: index as usize,
+            player_index: index,
             point_value: 5,
             score_type: ScoreType::Show(ShowScoreType::FiveFlush(all_cards)),
         });

@@ -98,6 +98,7 @@ mod test {
         expected_discards.sort();
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
         assert_eq!(game.crib, expected_discards);
+        assert_eq!(game.state, crate::GameState::CutStarter);
     }
 
     #[test]
@@ -544,5 +545,7 @@ fn execute_discard(game: &mut crate::GameImpl, discard_indices_group: Vec<Vec<u8
         }
 
         game.crib.sort();
+
+        game.state = crate::GameState::CutStarter;
     }
 }

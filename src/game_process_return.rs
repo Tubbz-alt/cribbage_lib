@@ -8,6 +8,7 @@ pub enum ConfigError {
     VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers,
     VDOIsNotLoserDrawsForDealerWhenVariantIsThreeCaptain,
     LowballEnabledWhenVariantIsThreeCaptain,
+    MugginsIsEnabledWhenLowballIsEnabled,
 }
 
 #[derive(Debug, PartialEq)]
@@ -52,6 +53,14 @@ pub enum ImplError {
     // vector should have one Vec<u8> per player even if that inner Vec<u8> is empty such as with
     // the dealer in the five or six card variations
     ThereShouldBeOneDiscardIndicesVectorPerPlayer,
+    // There will always be a starter card if you are using the public interface
+    NibsCheckWhenNoStarterCard,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum NibsError {
+    NoNibsCallWhenUnderscoringIsDisabled,
+    InvalidScoreEventToNibsCheck,
 }
 
 #[derive(Debug, PartialEq)]
@@ -61,6 +70,7 @@ pub enum Error {
     GameStartInvalidConfig(ConfigError),
     InitialCutError,
     DiscardErrors(Vec<DiscardError>),
+    NibsCallError(NibsError),
     UnimplementedState,
     UnrecognizedState,
 }
@@ -80,4 +90,5 @@ pub enum Success {
     Discard,
     StarterCut,
     NibsCheck,
+    NibsContest,
 }
