@@ -381,10 +381,13 @@ fn check_discard_validity(
         if let Some(settings) = game.settings {
             let error: Option<game_process_return::DiscardError> = match settings.variant {
                 crate::settings::RuleVariant::TwoStandard => {
-                    check_two_player_validity(player_index as u8, discards, false)
+                    check_two_player_validity(player_index as u8, discards, 6)
                 }
                 crate::settings::RuleVariant::TwoFiveCard => {
-                    check_two_player_validity(player_index as u8, discards, true)
+                    check_two_player_validity(player_index as u8, discards, 5)
+                }
+                crate::settings::RuleVariant::TwoSevenCard => {
+                    check_two_player_validity(player_index as u8, discards, 7)
                 }
                 crate::settings::RuleVariant::ThreeStandard => {
                     check_three_or_four_player_validity(player_index as u8, discards, 3)
@@ -430,7 +433,7 @@ fn check_discard_validity(
 fn check_two_player_validity(
     player_index: u8,
     discard_indices: &Vec<u8>,
-    is_five_card: bool,
+    num_players: u8,
 ) -> Option<game_process_return::DiscardError> {
     if discard_indices.len() != 2 {
         Some(game_process_return::DiscardError::TwoCardsAreDiscardedWithTwoPlayers(player_index))
@@ -438,10 +441,12 @@ fn check_two_player_validity(
         if discard_indices[0] == discard_indices[1] {
             Some(game_process_return::DiscardError::TwoCardIndicesMayNotBeRepeated(player_index))
         } else {
-            if is_five_card && (discard_indices[0] > 4 || discard_indices[1] > 4) {
+            if num_players == 5 && (discard_indices[0] > 4 || discard_indices[1] > 4) {
                 Some(game_process_return::DiscardError::IndicesAreBetween0And4InclusiveWithTwoFiveCard(player_index))
-            } else if !is_five_card && (discard_indices[0] > 5 || discard_indices[1] > 5) {
+            } else if num_players == 6 && (discard_indices[0] > 5 || discard_indices[1] > 5) {
                 Some(game_process_return::DiscardError::IndicesAreBetween0And5InclusiveWithTwoStandard(player_index))
+            } else if num_players == 7 && (discard_indices[0] > 6 || discard_indices[1] > 6) {
+                Some(game_process_return::DiscardError::IndicesAreBetween0And6InclusiveWithTwoSevenCard(player_index))
             } else {
                 None
             }

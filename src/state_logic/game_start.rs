@@ -51,21 +51,21 @@ mod test {
     // The following three tests check that settings validity is properly handled
 
     // An error should be returned when the victor_dealer_option is not TwoPlayers when the variant
-    // is TwoStandard or TwoFiveCard, when the victor_dealer_option is TwoPlayers with any other
-    // variant, or when the victor_dealer_option is LastPlaceIsDealer when the variant is ThreeCaptain
+    // is one of the two player versions, when the victor_dealer_option is TwoPlayers with any other
+    // variant, or when the victor_dealer_option is LastPlaceIsDealer when the variant is a variant
+    // with pairs
     #[test]
     fn settings_validity_vdo() {
-        let variants = crate::util::return_variants();
         let victor_dealer_options = vec![
             crate::settings::VictorDealerOption::LastPlaceIsDealer,
             crate::settings::VictorDealerOption::LosersDrawForDealer,
             crate::settings::VictorDealerOption::TwoPlayers,
         ];
 
-        for var in &variants {
+        for var in crate::util::return_variants() {
             for vdo in &victor_dealer_options {
                 let settings = crate::settings::GameSettings {
-                    variant: *var,
+                    variant: var,
                     victor_dealer_option: *vdo,
                     is_manual_scoring: false,
                     is_underpegging: false,
@@ -74,29 +74,32 @@ mod test {
                     is_lowball: false,
                 };
 
-                // If the variant is TwoStandard or TwoFiveCard and the victor_dealer_option is
-                // TwoPlayers return Ok, otherwise return VDOIsNotTwoPlayersWhenVariantIsTwoPlayers
-                if settings.variant == crate::settings::RuleVariant::TwoStandard
-                    || settings.variant == crate::settings::RuleVariant::TwoFiveCard
-                {
+                // If the variant is a two player variant and the victor_dealer_option is not
+                // TwoPlayers return VDOIsNotTwoPlayersWhenVariantIsTwoPlayers
+                if crate::util::return_num_players_for_variant(settings.variant) == 2 {
                     if settings.victor_dealer_option
-                        == crate::settings::VictorDealerOption::TwoPlayers
+                        != crate::settings::VictorDealerOption::TwoPlayers
                     {
-                        assert_eq!(super::check_settings_validity(settings), Ok(()));
-                    } else {
                         assert_eq!(super::check_settings_validity(settings), Err(
                             super::game_process_return::Error::GameStartInvalidConfig(
                                 super::game_process_return::ConfigError::VDOIsNotTwoPlayersWhenVariantIsTwoPlayers
                             )
-                        ));
+                            ));
+                    }
+                    // If the VDO is valid
+                    else {
+                        assert_eq!(super::check_settings_validity(settings), Ok(()));
                     }
                 }
-                // If the variant is ThreeCaptain and the victor_dealer_option is
-                // LosersDrawForDealer return Ok, but if the victor_dealer_option is TwoPlayers
-                // return VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers or if the
-                // victor_dealer_option is LastPlaceIsDealer return
-                // VDOIsNotLoserDrawsForDealerWhenVariantIsThreeCaptain
-                else if settings.variant == crate::settings::RuleVariant::ThreeCaptain {
+                // If the variant is ThreeCaptain, FourPairs, or SixPairs, and the
+                // victor_dealer_option is LosersDrawForDealer return Ok, but if the
+                // victor_dealer_option is TwoPlayers return
+                // VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers or if the victor_dealer_option
+                // is LastPlaceIsDealer return VDOIsNotLoserDrawsForDealerWhenVariantHasPairs
+                else if settings.variant == crate::settings::RuleVariant::ThreeCaptain
+                    || settings.variant == crate::settings::RuleVariant::FourPairs
+                    || settings.variant == crate::settings::RuleVariant::SixPairs
+                {
                     if settings.victor_dealer_option
                         == crate::settings::VictorDealerOption::TwoPlayers
                     {
@@ -110,7 +113,7 @@ mod test {
                     {
                         assert_eq!(super::check_settings_validity(settings), Err(
                             super::game_process_return::Error::GameStartInvalidConfig(
-                                super::game_process_return::ConfigError::VDOIsNotLoserDrawsForDealerWhenVariantIsThreeCaptain
+                                super::game_process_return::ConfigError::VDOIsNotLoserDrawsForDealerWhenVariantHasPairs
                             )
                         ));
                     } else {
@@ -136,28 +139,44 @@ mod test {
         }
     }
 
-    // An error should be returned with the variant is ThreeCaptain and Lowball is enabled
+    // An error should be returned with the variant is not one of the two player varieties or
+    // FourPairs and Lowball is enabled; because the goal is to not reach 121, lowball only works
+    // with variants that have only one player/pair to not reach 121
     #[test]
-    fn settings_validity_lowball_three_captain() {
+    fn settings_validity_lowball() {
         let bool_options = vec![false, true];
         for option in &bool_options {
-            let settings = crate::settings::GameSettings {
-                variant: crate::settings::RuleVariant::ThreeCaptain,
-                victor_dealer_option: crate::settings::VictorDealerOption::LosersDrawForDealer,
-                is_manual_scoring: false,
-                is_underpegging: false,
-                is_muggins: false,
-                is_overpegging: false,
-                is_lowball: *option,
-            };
+            for variant in crate::util::return_variants() {
+                let vdo = {
+                    if crate::util::return_num_players_for_variant(variant) == 2 {
+                        crate::settings::VictorDealerOption::TwoPlayers
+                    } else {
+                        crate::settings::VictorDealerOption::LosersDrawForDealer
+                    }
+                };
 
-            if settings.is_lowball {
-                assert_eq!(super::check_settings_validity(settings),
-                Err(super::game_process_return::Error::GameStartInvalidConfig(
-                    super::game_process_return::ConfigError::LowballEnabledWhenVariantIsThreeCaptain
+                let settings = crate::settings::GameSettings {
+                    variant: variant,
+                    victor_dealer_option: vdo,
+                    is_manual_scoring: false,
+                    is_underpegging: false,
+                    is_muggins: false,
+                    is_overpegging: false,
+                    is_lowball: *option,
+                };
+
+                if settings.is_lowball
+                    && crate::util::return_num_players_for_variant(variant) != 2
+                    && variant != crate::settings::RuleVariant::FourPairs
+                    && variant != crate::settings::RuleVariant::ThreeCaptain
+                {
+                    assert_eq!(super::check_settings_validity(settings),
+                    Err(super::game_process_return::Error::GameStartInvalidConfig(
+                        super::game_process_return::ConfigError::LowballEnabledWhenVariantIsNotTwoPlayersOrPairs
                 )));
-            } else {
-                assert_eq!(super::check_settings_validity(settings), Ok(()));
+                } else {
+                    assert_eq!(super::check_settings_validity(settings), Ok(()));
+                }
             }
         }
     }
@@ -277,6 +296,15 @@ mod test {
     }
 
     #[test]
+    fn set_up_two_seven_card() {
+        let mut game = set_up_game(crate::settings::RuleVariant::TwoSevenCard);
+        super::set_up_players(&mut game);
+        assert_eq!(game.players.len(), 2);
+        assert_eq!(game.players[0].partner_index, None);
+        assert_eq!(game.players[1].partner_index, None);
+    }
+
+    #[test]
     fn set_up_three_standard() {
         let mut game = set_up_game(crate::settings::RuleVariant::ThreeStandard);
         super::set_up_players(&mut game);
@@ -377,7 +405,8 @@ fn check_settings_validity(
 ) -> Result<(), game_process_return::Error> {
     // If the variant is one of the two player variants but the VictorDealerOption isn't TwoPlayers
     if (settings.variant == crate::settings::RuleVariant::TwoStandard
-        || settings.variant == crate::settings::RuleVariant::TwoFiveCard)
+        || settings.variant == crate::settings::RuleVariant::TwoFiveCard
+        || settings.variant == crate::settings::RuleVariant::TwoSevenCard)
         && settings.victor_dealer_option != crate::settings::VictorDealerOption::TwoPlayers
     {
         return Err(game_process_return::Error::GameStartInvalidConfig(
@@ -388,6 +417,7 @@ fn check_settings_validity(
     // If the variant is three or more players but the VictorDealerOption is TwoPlayers
     if settings.variant != crate::settings::RuleVariant::TwoStandard
         && settings.variant != crate::settings::RuleVariant::TwoFiveCard
+        && settings.variant != crate::settings::RuleVariant::TwoSevenCard
         && settings.victor_dealer_option == crate::settings::VictorDealerOption::TwoPlayers
     {
         return Err(game_process_return::Error::GameStartInvalidConfig(
@@ -395,22 +425,28 @@ fn check_settings_validity(
         ));
     }
 
-    // If the variant is ThreeCaptain then do not allow the victor_dealer_option to be
-    // LastPlaceIsDealer because the partners change so the losers should always draw for first crib
-    if settings.variant == crate::settings::RuleVariant::ThreeCaptain
+    // If the variant is ThreeCaptain, FourPairs, or SixPairs then do not allow the
+    // victor_dealer_option to be LastPlaceIsDealer because there are partners so the losers
+    // should always draw for first crib
+    if (settings.variant == crate::settings::RuleVariant::ThreeCaptain
+        || settings.variant == crate::settings::RuleVariant::FourPairs
+        || settings.variant == crate::settings::RuleVariant::SixPairs)
         && settings.victor_dealer_option == crate::settings::VictorDealerOption::LastPlaceIsDealer
     {
         return Err(game_process_return::Error::GameStartInvalidConfig(
-            game_process_return::ConfigError::VDOIsNotLoserDrawsForDealerWhenVariantIsThreeCaptain,
+            game_process_return::ConfigError::VDOIsNotLoserDrawsForDealerWhenVariantHasPairs,
         ));
     }
 
-    // If the variant is Captain's Cribbage, then it doesn't really work with lowball; maybe change
-    // this in the future but it really seems like the pair has a real advantage were this
-    // configuration allowed
-    if settings.variant == crate::settings::RuleVariant::ThreeCaptain && settings.is_lowball {
+    // If the variant has more than two players/pairs, then it doesn't work with lowball as the
+    // game can't go on after one player/pair has won
+    if (settings.variant == crate::settings::RuleVariant::ThreeStandard
+        || settings.variant == crate::settings::RuleVariant::FourIndividual
+        || crate::util::return_num_players_for_variant(settings.variant) > 4)
+        && settings.is_lowball
+    {
         return Err(game_process_return::Error::GameStartInvalidConfig(
-            game_process_return::ConfigError::LowballEnabledWhenVariantIsThreeCaptain,
+            game_process_return::ConfigError::LowballEnabledWhenVariantIsNotTwoPlayersOrPairs,
         ));
     }
 
@@ -453,34 +489,35 @@ fn check_settings_validity(
 fn set_up_players(game: &mut crate::GameImpl) {
     if let Some(settings) = game.settings {
         game.players = match settings.variant {
-            crate::settings::RuleVariant::TwoStandard
-            | crate::settings::RuleVariant::TwoFiveCard => set_up_no_partners(2),
-            crate::settings::RuleVariant::ThreeStandard => set_up_no_partners(3),
+            crate::settings::RuleVariant::TwoStandard => set_up_no_partners(2, 6),
+            crate::settings::RuleVariant::TwoFiveCard => set_up_no_partners(2, 5),
+            crate::settings::RuleVariant::TwoSevenCard => set_up_no_partners(2, 7),
+            crate::settings::RuleVariant::ThreeStandard => set_up_no_partners(3, 5),
             crate::settings::RuleVariant::ThreeCaptain => set_up_three_captain(),
-            crate::settings::RuleVariant::FourIndividual => set_up_no_partners(4),
+            crate::settings::RuleVariant::FourIndividual => set_up_no_partners(4, 5),
             crate::settings::RuleVariant::FourPairs => set_up_four_pairs(),
-            crate::settings::RuleVariant::FiveStandard => set_up_no_partners(5),
+            crate::settings::RuleVariant::FiveStandard => set_up_no_partners(5, 5),
             crate::settings::RuleVariant::SixPairs => set_up_six_pairs(),
         };
     }
 }
 
 // Return a player with no score and the given partner
-fn set_up_player(partner_index: Option<u8>) -> player::Player {
+fn set_up_player(partner_index: Option<u8>, num_cards: u8) -> player::Player {
     player::Player {
         back_peg_pos: 0,
         front_peg_pos: 0,
-        hand: Vec::with_capacity(6),
+        hand: Vec::with_capacity(num_cards as usize),
         partner_index: partner_index,
     }
 }
 
 // The following four functions return a vector of Players to be given to the GameImpl object
 
-fn set_up_no_partners(num_players: u8) -> Vec<player::Player> {
+fn set_up_no_partners(num_players: u8, num_cards: u8) -> Vec<player::Player> {
     let mut players = Vec::new();
     for _ in 0..num_players {
-        players.push(set_up_player(None));
+        players.push(set_up_player(None, num_cards));
     }
     players
 }
@@ -489,9 +526,9 @@ fn set_up_three_captain() -> Vec<player::Player> {
     let mut players = Vec::new();
     for index in 0..3 {
         players.push(match index {
-            0 => set_up_player(None),
-            1 => set_up_player(Some(2)),
-            2 => set_up_player(Some(1)),
+            0 => set_up_player(None, 5),
+            1 => set_up_player(Some(2), 5),
+            2 => set_up_player(Some(1), 5),
             _ => panic!("Invalid index set_up_three_captain"),
         })
     }
@@ -502,10 +539,10 @@ fn set_up_four_pairs() -> Vec<player::Player> {
     let mut players = Vec::new();
     for index in 0..4 {
         players.push(match index {
-            0 => set_up_player(Some(2)),
-            1 => set_up_player(Some(3)),
-            2 => set_up_player(Some(0)),
-            3 => set_up_player(Some(1)),
+            0 => set_up_player(Some(2), 5),
+            1 => set_up_player(Some(3), 5),
+            2 => set_up_player(Some(0), 5),
+            3 => set_up_player(Some(1), 5),
             _ => panic!("Invalid index set_up_four_pairs"),
         })
     }
@@ -516,12 +553,12 @@ fn set_up_six_pairs() -> Vec<player::Player> {
     let mut players = Vec::new();
     for index in 0..6 {
         players.push(match index {
-            0 => set_up_player(Some(3)),
-            1 => set_up_player(Some(4)),
-            2 => set_up_player(Some(5)),
-            3 => set_up_player(Some(0)),
-            4 => set_up_player(Some(1)),
-            5 => set_up_player(Some(2)),
+            0 => set_up_player(Some(3), 5),
+            1 => set_up_player(Some(4), 5),
+            2 => set_up_player(Some(5), 5),
+            3 => set_up_player(Some(0), 5),
+            4 => set_up_player(Some(1), 5),
+            5 => set_up_player(Some(2), 5),
             _ => panic!("Invalid index set_up_six_pairs"),
         })
     }

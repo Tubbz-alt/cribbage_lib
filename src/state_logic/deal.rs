@@ -7,14 +7,12 @@ mod test {
         let mut game = crate::GameImpl::new();
         game.is_debug = true;
 
-        let vdo = match variant {
-            crate::settings::RuleVariant::TwoStandard => {
+        let vdo = {
+            if crate::util::return_num_players_for_variant(variant) == 2 {
                 crate::settings::VictorDealerOption::TwoPlayers
+            } else {
+                crate::settings::VictorDealerOption::LosersDrawForDealer
             }
-            crate::settings::RuleVariant::TwoFiveCard => {
-                crate::settings::VictorDealerOption::TwoPlayers
-            }
-            _ => crate::settings::VictorDealerOption::LosersDrawForDealer,
         };
 
         let settings = crate::settings::GameSettings {
@@ -62,6 +60,20 @@ mod test {
 
         assert_eq!(game.players[0].hand.len(), 5);
         assert_eq!(game.players[1].hand.len(), 5);
+    }
+
+    #[test]
+    fn process_deal_two_seven_card() {
+        let mut game = set_up_game(crate::settings::RuleVariant::TwoSevenCard);
+
+        assert_eq!(
+            super::process_deal(&mut game),
+            Ok(super::game_process_return::Success::Deal)
+        );
+
+        assert_eq!(game.players[0].hand.len(), 7);
+        assert_eq!(game.players[1].hand.len(), 7);
+        assert_eq!(game.crib.len(), 1);
     }
 
     #[test]
@@ -175,6 +187,7 @@ pub(crate) fn process_deal(
         match settings.variant {
             crate::settings::RuleVariant::TwoStandard => deal_two(6, game),
             crate::settings::RuleVariant::TwoFiveCard => deal_two(5, game),
+            crate::settings::RuleVariant::TwoSevenCard => deal_two(7, game),
             crate::settings::RuleVariant::ThreeStandard
             | crate::settings::RuleVariant::ThreeCaptain => deal_three(game),
             crate::settings::RuleVariant::FourIndividual
@@ -197,6 +210,11 @@ fn deal_two(cards: u8, game: &mut crate::GameImpl) {
         for player in 0..2 {
             push_card_to_hand(player, game);
         }
+    }
+
+    // In seven card cribbage, deal one card to the crib
+    if cards == 7 {
+        game.crib.push(game.deck.deal());
     }
 }
 

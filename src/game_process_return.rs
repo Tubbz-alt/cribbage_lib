@@ -6,8 +6,8 @@ pub enum ConfigError {
     OverpeggingEnabledWhenManualScoringIsDisabled,
     VDOIsNotTwoPlayersWhenVariantIsTwoPlayers,
     VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers,
-    VDOIsNotLoserDrawsForDealerWhenVariantIsThreeCaptain,
-    LowballEnabledWhenVariantIsThreeCaptain,
+    VDOIsNotLoserDrawsForDealerWhenVariantHasPairs,
+    LowballEnabledWhenVariantIsNotTwoPlayersOrPairs,
     MugginsIsEnabledWhenLowballIsEnabled,
 }
 
@@ -37,6 +37,7 @@ pub enum DiscardError {
     // Error with the indices given
     TwoCardIndicesMayNotBeRepeated(u8),
     IndicesAreBetween0And5InclusiveWithTwoStandard(u8),
+    IndicesAreBetween0And6InclusiveWithTwoSevenCard(u8),
     IndicesAreBetween0And4InclusiveWithTwoFiveCard(u8),
     IndicesAreBetween0And4InclusiveWithThreeOrMorePlayers(u8),
 }

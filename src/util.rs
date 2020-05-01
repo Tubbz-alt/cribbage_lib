@@ -40,6 +40,7 @@ pub(crate) fn return_variants() -> Vec<super::settings::RuleVariant> {
     vec![
         super::settings::RuleVariant::TwoStandard,
         super::settings::RuleVariant::TwoFiveCard,
+        super::settings::RuleVariant::TwoSevenCard,
         super::settings::RuleVariant::ThreeStandard,
         super::settings::RuleVariant::ThreeCaptain,
         super::settings::RuleVariant::FourIndividual,
@@ -54,6 +55,7 @@ pub(crate) fn return_num_players_for_variant(variant: super::settings::RuleVaria
     match variant {
         crate::settings::RuleVariant::TwoStandard => 2,
         crate::settings::RuleVariant::TwoFiveCard => 2,
+        crate::settings::RuleVariant::TwoSevenCard => 2,
         crate::settings::RuleVariant::ThreeStandard => 3,
         crate::settings::RuleVariant::ThreeCaptain => 3,
         crate::settings::RuleVariant::FourIndividual => 4,

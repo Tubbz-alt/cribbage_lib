@@ -177,6 +177,7 @@ mod test {
                         process_nibs(&mut game, None),
                         Ok(crate::game_process_return::Success::NibsCheck)
                     );
+                    assert_eq!(game.players[0].front_peg_pos, 0);
                     assert_eq!(game.state, crate::GameState::PlayWaitForCard);
                 }
 

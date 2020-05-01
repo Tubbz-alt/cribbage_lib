@@ -11,18 +11,16 @@ mod test {
         let mut game = crate::GameImpl::new();
         game.is_debug = true;
 
-        let vdo = match variant {
-            crate::settings::RuleVariant::TwoStandard => {
+        let vdo = {
+            if crate::util::return_num_players_for_variant(variant) == 2 {
                 crate::settings::VictorDealerOption::TwoPlayers
+            } else {
+                crate::settings::VictorDealerOption::LosersDrawForDealer
             }
-            crate::settings::RuleVariant::TwoFiveCard => {
-                crate::settings::VictorDealerOption::TwoPlayers
-            }
-            _ => crate::settings::VictorDealerOption::LosersDrawForDealer,
         };
 
         let settings = crate::settings::GameSettings {
-            variant: variant,
+            variant,
             victor_dealer_option: vdo,
             is_manual_scoring: false,
             is_underpegging: false,
