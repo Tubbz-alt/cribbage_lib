@@ -7,14 +7,12 @@ mod test {
         let mut game = crate::GameImpl::new();
         game.is_debug = true;
 
-        let vdo = match variant {
-            crate::settings::RuleVariant::TwoStandard => {
+        let vdo = {
+            if crate::util::return_num_players_for_variant(variant) == 2 {
                 crate::settings::VictorDealerOption::TwoPlayers
+            } else {
+                crate::settings::VictorDealerOption::LosersDrawForDealer
             }
-            crate::settings::RuleVariant::TwoFiveCard => {
-                crate::settings::VictorDealerOption::TwoPlayers
-            }
-            _ => crate::settings::VictorDealerOption::LosersDrawForDealer,
         };
 
         let settings = crate::settings::GameSettings {
@@ -156,6 +154,70 @@ mod test {
         ];
         expected_discards.sort();
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
+        assert_eq!(game.crib, expected_discards);
+    }
+
+    #[test]
+    fn two_seven_card_discard_validity() {
+        let mut game = set_up_game(crate::settings::RuleVariant::TwoSevenCard);
+
+        // Test invalid number of inner vectors
+        let discard_indices_group: Vec<Vec<u8>> = vec![vec![0, 1]];
+        assert_eq!(
+            super::process_discard(&mut game, discard_indices_group),
+            Err( super::game_process_return::Error::ImplementationError(
+                    super::game_process_return::ImplError::ThereShouldBeOneDiscardIndicesVectorPerPlayer 
+                )
+            )
+        );
+
+        // Test invalid number of indices
+        let discard_indices_group: Vec<Vec<u8>> = vec![vec![0], vec![0,1,2]];
+        let expected_output: Vec<super::game_process_return::DiscardError> = vec![
+            super::game_process_return::DiscardError::TwoCardsAreDiscardedWithTwoPlayers(0),
+            super::game_process_return::DiscardError::TwoCardsAreDiscardedWithTwoPlayers(1)
+        ];
+        assert_eq!(
+            super::process_discard(&mut game, discard_indices_group),
+            Err(super::game_process_return::Error::DiscardErrors(expected_output))
+        );
+
+        // Test repeated index
+        let discard_indices_group: Vec<Vec<u8>> = vec![vec![0,0], vec![0,1]];
+        let expected_output: Vec<super::game_process_return::DiscardError> = vec![
+            super::game_process_return::DiscardError::TwoCardIndicesMayNotBeRepeated(0)
+        ];
+        assert_eq!(
+            super::process_discard(&mut game, discard_indices_group),
+            Err(super::game_process_return::Error::DiscardErrors(expected_output))
+        );
+
+        // Test index out of bounds
+        let discard_indices_group: Vec<Vec<u8>> = vec![vec![0, 7], vec![0, 1]];
+        let expected_output: Vec<super::game_process_return::DiscardError> = vec![
+            super::game_process_return::DiscardError::IndicesAreBetween0And6InclusiveWithTwoSevenCard(0)
+        ];
+        assert_eq!(
+            super::process_discard(&mut game, discard_indices_group),
+            Err(super::game_process_return::Error::DiscardErrors(expected_output))
+        );
+
+        // Test valid input
+        let discard_indices_group: Vec<Vec<u8>> = vec![vec![0,1], vec![0,1]];
+        // One card is dealt directly to the crib in seven card cribbage
+        let mut expected_discards: Vec<crate::deck::Card>  = vec![
+            game.players[0].hand[0],
+            game.players[0].hand[1], 
+            game.players[1].hand[0],
+            game.players[1].hand[1],
+            crate::util::return_card('2', 'D'),
+        ];
+        expected_discards.sort();
+
+        
+        assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
+
+
         assert_eq!(game.crib, expected_discards);
     }
 
