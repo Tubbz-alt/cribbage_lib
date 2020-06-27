@@ -6,6 +6,8 @@ pub enum ConfigError {
     OverpeggingEnabledWhenManualScoringIsDisabled,
     VDOIsNotTwoPlayersWhenVariantIsTwoPlayers,
     VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers,
+    VDOIsNotCaptainDealsWhenVariantIsThreeCaptain,
+    VDOIsCaptainDealsWhenVariantIsNotThreeCaptain,
     VDOIsNotLoserDrawsForDealerWhenVariantHasPairs,
     LowballEnabledWhenVariantIsNotTwoPlayersOrPairs,
     MugginsIsEnabledWhenLowballIsEnabled,

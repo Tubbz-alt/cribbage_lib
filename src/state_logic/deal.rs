@@ -10,6 +10,8 @@ mod test {
         let vdo = {
             if crate::util::return_num_players_for_variant(variant) == 2 {
                 crate::settings::VictorDealerOption::TwoPlayers
+            } else if variant == crate::settings::RuleVariant::ThreeCaptain {
+                crate::settings::VictorDealerOption::CaptainDeals
             } else {
                 crate::settings::VictorDealerOption::LosersDrawForDealer
             }

@@ -64,3 +64,8 @@ pub(crate) fn return_num_players_for_variant(variant: super::settings::RuleVaria
         crate::settings::RuleVariant::SixPairs => 6,
     }
 }
+
+// Processes a score change; ensures change also occurs with partner and check for victory (or loss
+// with lowball)
+// TODO
+pub(crate) fn process_score() {}

@@ -31,13 +31,14 @@ pub enum RuleVariant {
 // A setting for how the dealer for the next game in the match is chosen; with two players the first
 // dealer is the player who lost the game, but with three or more players I figure you can either
 // have all of the losers cut for first dealer as if it were the initial game, or you can have the
-// last place loser draw; when the PlayUntilOption is ranked and the VictorDealerOption is
-// LosersDrawForDealer, all victors but first place are considered losers who draw
+// last place loser (or losers with a pair) draw. With captain's cribbage, the captain always deals
+// first.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum VictorDealerOption {
     TwoPlayers,
     LosersDrawForDealer,
     LastPlaceIsDealer,
+    CaptainDeals,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -48,5 +49,8 @@ pub struct GameSettings {
     pub is_underpegging: bool,
     pub is_muggins: bool,
     pub is_overpegging: bool,
+    // A game where the first person to reach the threshold loses. This only works with variants
+    // that only have two teams (such that there are not multiple winners) ie all the two player
+    // variants, captain's cribbage, and four players in pairs
     pub is_lowball: bool,
 }

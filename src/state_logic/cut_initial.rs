@@ -14,6 +14,8 @@ mod test {
         let vdo = {
             if crate::util::return_num_players_for_variant(variant) == 2 {
                 crate::settings::VictorDealerOption::TwoPlayers
+            } else if variant == crate::settings::RuleVariant::ThreeCaptain {
+                crate::settings::VictorDealerOption::CaptainDeals
             } else {
                 crate::settings::VictorDealerOption::LosersDrawForDealer
             }
@@ -52,9 +54,7 @@ mod test {
 
     #[test]
     fn process_cut_between_only_one() {
-        let variants = crate::util::return_variants();
-
-        for variant in variants {
+        for variant in crate::util::return_variants() {
             let mut game = set_up_game(1, variant);
             assert_eq!(
                 super::process_cut(&mut game),
