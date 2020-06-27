@@ -6,7 +6,8 @@ use std::cmp;
 #[cfg(test)]
 mod test {
     // Returns a GameImpl with a valid configuration in debug mode with a given rule variant and
-    // an initial_cut_between_number_number
+    // an the number of players who the cut is against; with captain's cribbage, the captain is
+    // always first dealer, so there is no cut and the num_between must be 1
     fn set_up_game(num_between: u8, variant: crate::settings::RuleVariant) -> crate::GameImpl {
         let mut game = crate::GameImpl::new();
         game.is_debug = true;
@@ -32,6 +33,10 @@ mod test {
         };
 
         crate::state_logic::game_start::game_setup(&mut game, settings).unwrap();
+
+        if num_between != 1 && variant == crate::settings::RuleVariant::ThreeCaptain {
+            panic!("num_between in set_up_game() helper function must for state_logic/cut_initial must be 1 with captain's cribbage");
+        }
 
         if num_between > game.players.len() as u8 || num_between == 0 {
             panic!(
@@ -69,25 +74,28 @@ mod test {
     #[test]
     fn process_cut_between_several_no_tie() {
         for variant in crate::util::return_variants() {
-            for cut_between in 1..crate::util::return_num_players_for_variant(variant) + 1 {
-                let mut game = set_up_game(cut_between, variant);
-                // Creates a deck which will descend such that the last player to receive a card is
-                // the victor of the cut
-                let mut debug_deck = Vec::new();
-                for card_value in 1..cut_between + 1 {
-                    debug_deck.push(crate::util::return_card((card_value + 48) as char, 'H'));
+            if variant != crate::settings::RuleVariant::ThreeCaptain {
+                for cut_between in 1..crate::util::return_num_players_for_variant(variant) + 1 {
+                    println!("{:?}", variant);
+                    let mut game = set_up_game(cut_between, variant);
+                    // Creates a deck which will descend such that the last player to receive a card is
+                    // the victor of the cut
+                    let mut debug_deck = Vec::new();
+                    for card_value in 1..cut_between + 1 {
+                        debug_deck.push(crate::util::return_card((card_value + 48) as char, 'H'));
+                    }
+
+                    game.deck = crate::deck::Deck::from_vec(debug_deck);
+
+                    assert_eq!(
+                        super::process_cut(&mut game),
+                        Ok(super::game_process_return::Success::InitialCut(
+                            super::game_process_return::InitialCutReturn::DealerChosen
+                        ))
+                    );
+
+                    assert_eq!(game.index_dealer, Some(cut_between - 1));
                 }
-
-                game.deck = crate::deck::Deck::from_vec(debug_deck);
-
-                assert_eq!(
-                    super::process_cut(&mut game),
-                    Ok(super::game_process_return::Success::InitialCut(
-                        super::game_process_return::InitialCutReturn::DealerChosen
-                    ))
-                );
-
-                assert_eq!(game.index_dealer, Some(cut_between - 1));
             }
         }
     }
@@ -95,45 +103,48 @@ mod test {
     #[test]
     fn process_cut_between_several_with_tie() {
         for variant in crate::util::return_variants() {
-            for cut_between in 2..crate::util::return_num_players_for_variant(variant) + 1 {
-                // For each possible number of ties (2 with a 2 cut between; 2,3 with a 3 cut
-                // between; and 2,3,4 with a 4 or more cut between)
-                for tie_between in 2..super::cmp::min(5, cut_between + 1) {
-                    let mut game = set_up_game(cut_between, variant);
-                    let mut debug_deck = Vec::new();
-                    // Push tie_between number of Aces to the deck such that the last tie_between
-                    // players are the players who tie and continue to the next cut
-                    for _ in 0..tie_between {
-                        debug_deck.push(crate::util::return_card('A', 'H'));
+            if variant != crate::settings::RuleVariant::ThreeCaptain {
+                for cut_between in 2..crate::util::return_num_players_for_variant(variant) + 1 {
+                    // For each possible number of ties (2 with a 2 cut between; 2,3 with a 3 cut
+                    // between; and 2,3,4 with a 4 or more cut between)
+                    for tie_between in 2..super::cmp::min(5, cut_between + 1) {
+                        let mut game = set_up_game(cut_between, variant);
+                        let mut debug_deck = Vec::new();
+                        // Push tie_between number of Aces to the deck such that the last tie_between
+                        // players are the players who tie and continue to the next cut
+                        for _ in 0..tie_between {
+                            debug_deck.push(crate::util::return_card('A', 'H'));
+                        }
+                        // The remaining cards are 3,4,5... until there are cards for every player who
+                        // the cut is between
+                        for card_value in 2..(2 + cut_between - tie_between) {
+                            debug_deck
+                                .push(crate::util::return_card((card_value + 48) as char, 'H'));
+                        }
+
+                        game.deck = crate::deck::Deck::from_vec(debug_deck);
+
+                        // Assert that the cut was a tie
+                        assert_eq!(
+                            super::process_cut(&mut game),
+                            Ok(super::game_process_return::Success::InitialCut(
+                                super::game_process_return::InitialCutReturn::CutTie
+                            ))
+                        );
+
+                        // Assert that the new value of the 'initial_cut_between_players_with_these_
+                        // indices' are a vector of u8s of the last tie_between player indices
+                        let mut expected_indices = Vec::new();
+                        for index in (cut_between - tie_between)..cut_between {
+                            expected_indices.push(index);
+                        }
+                        assert_eq!(
+                            game.initial_cut_between_players_with_these_indices,
+                            expected_indices
+                        );
+
+                        assert_eq!(game.state, crate::GameState::CutInitial);
                     }
-                    // The remaining cards are 3,4,5... until there are cards for every player who
-                    // the cut is between
-                    for card_value in 2..(2 + cut_between - tie_between) {
-                        debug_deck.push(crate::util::return_card((card_value + 48) as char, 'H'));
-                    }
-
-                    game.deck = crate::deck::Deck::from_vec(debug_deck);
-
-                    // Assert that the cut was a tie
-                    assert_eq!(
-                        super::process_cut(&mut game),
-                        Ok(super::game_process_return::Success::InitialCut(
-                            super::game_process_return::InitialCutReturn::CutTie
-                        ))
-                    );
-
-                    // Assert that the new value of the 'initial_cut_between_players_with_these_
-                    // indices' are a vector of u8s of the last tie_between player indices
-                    let mut expected_indices = Vec::new();
-                    for index in (cut_between - tie_between)..cut_between {
-                        expected_indices.push(index);
-                    }
-                    assert_eq!(
-                        game.initial_cut_between_players_with_these_indices,
-                        expected_indices
-                    );
-
-                    assert_eq!(game.state, crate::GameState::CutInitial);
                 }
             }
         }
@@ -177,9 +188,6 @@ mod test {
             assert_eq!(game.players[index_loser].front_peg_pos, 3);
         }
     }
-
-    #[test]
-    fn process_cut_out_of_debug() {}
 }
 
 pub(crate) fn process_cut(

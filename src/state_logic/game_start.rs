@@ -438,10 +438,15 @@ pub(crate) fn game_setup(
     game.deck.reset_deck();
     game.crib = Vec::with_capacity(4);
 
-    // When a game is being setup, the initial cut is between all players
-    for index in 0..game.players.len() {
-        game.initial_cut_between_players_with_these_indices
-            .push(index as u8);
+    // When a game is being setup, the initial cut is between all players unless the variant is
+    // captain's cribbage in which the first dealer is always the captain
+    if settings.variant == crate::settings::RuleVariant::ThreeCaptain {
+        game.initial_cut_between_players_with_these_indices.push(0);
+    } else {
+        for index in 0..game.players.len() {
+            game.initial_cut_between_players_with_these_indices
+                .push(index as u8);
+        }
     }
 
     game.state = crate::GameState::CutInitial;
