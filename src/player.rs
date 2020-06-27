@@ -13,15 +13,12 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn change_score(&mut self, change: i8) {
+    pub fn change_score(&mut self, change: u8) {
         // Move the back peg up and then the front peg forward to simulate moving the back peg
         // forward past the front peg when the change is positive
         if change > 0 {
             self.back_peg_pos = self.front_peg_pos;
             self.front_peg_pos += change as u8;
-        } else if change < 0 {
-            // TODO with score penalties for overpegging; ensure check to make sure score does not
-            // go below zero
         }
         // If no points are scored, the pegs should not be touched
     }

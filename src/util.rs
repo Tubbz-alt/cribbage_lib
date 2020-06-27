@@ -66,6 +66,58 @@ pub(crate) fn return_num_players_for_variant(variant: super::settings::RuleVaria
 }
 
 // Processes a score change; ensures change also occurs with partner and check for victory (or loss
-// with lowball)
-// TODO
-pub(crate) fn process_score() {}
+// with lowball). Returns true if a player has reached the threshold, otherwise return false
+pub(crate) fn process_score(
+    game: &mut crate::GameImpl,
+    player_index: usize,
+    score_change: u8,
+) -> bool {
+    game.players[player_index].change_score(score_change);
+    if let Some(partner_index) = game.players[player_index].partner_index {
+        game.players[partner_index as usize].change_score(score_change);
+    }
+
+    match game.settings.unwrap().variant {
+        crate::settings::RuleVariant::TwoFiveCard => {
+            if game.players[player_index].front_peg_pos >= 61 {
+                game.state = crate::GameState::Win;
+                true
+            } else {
+                false
+            }
+        }
+        crate::settings::RuleVariant::TwoSevenCard => {
+            if game.players[player_index].front_peg_pos >= 151 {
+                game.state = crate::GameState::Win;
+                true
+            } else {
+                false
+            }
+        }
+        crate::settings::RuleVariant::ThreeCaptain => {
+            if game.players[player_index].partner_index.is_some() {
+                if game.players[player_index].front_peg_pos >= 121 {
+                    game.state = crate::GameState::Win;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                if game.players[player_index].front_peg_pos >= 61 {
+                    game.state = crate::GameState::Win;
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        _ => {
+            if game.players[player_index].front_peg_pos >= 121 {
+                game.state = crate::GameState::Win;
+                true
+            } else {
+                false
+            }
+        }
+    }
+}

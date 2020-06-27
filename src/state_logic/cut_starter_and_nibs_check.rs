@@ -292,19 +292,12 @@ pub(crate) fn process_cut(
     if !game.settings.unwrap().is_manual_scoring {
         if crate::deck::return_value(game.starter_card.unwrap()) == 11 {
             let dealer_index: usize = game.index_dealer.unwrap() as usize;
-
-            game.players[dealer_index].change_score(2);
-            if let Some(partner_index) = game.players[dealer_index].partner_index {
-                game.players[partner_index as usize].change_score(2);
+            if !crate::util::process_score(game, dealer_index, 2) {
+                game.state = crate::GameState::PlayWaitForCard;
             }
-
-            if game.players[dealer_index].front_peg_pos >= 121 {
-                game.state = crate::GameState::Win;
-                return Ok(game_process_return::Success::StarterCut);
-            }
+        } else {
+            game.state = crate::GameState::PlayWaitForCard;
         }
-
-        game.state = crate::GameState::PlayWaitForCard;
     } else {
         game.state = crate::GameState::NibsCheck;
     }
@@ -346,15 +339,8 @@ pub(crate) fn process_nibs(
                         point_value: 2,
                     })
                 {
-                    game.players[game.index_dealer.unwrap() as usize].change_score(2);
-                    if let Some(partner_index) =
-                        game.players[game.index_dealer.unwrap() as usize].partner_index
-                    {
-                        game.players[partner_index as usize].change_score(2);
-                    }
-                    if game.players[game.index_dealer.unwrap() as usize].front_peg_pos >= 121 {
-                        game.state = crate::GameState::Win;
-                    } else {
+                    let index_dealer = game.index_dealer.unwrap() as usize;
+                    if !crate::util::process_score(game, index_dealer, 2) {
                         game.state = crate::GameState::PlayWaitForCard;
                     }
                     Ok(game_process_return::Success::NibsCheck)
