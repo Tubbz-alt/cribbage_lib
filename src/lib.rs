@@ -254,6 +254,8 @@ pub enum GameState {
     ShowScore,
     // Deals with the calling of muggins for the last hand to be scored with a Muggins event
     ShowMuggins,
+    // Sorts the crib after receiving a Confirmation event
+    CribSort,
     // Deals with the automatic or manual scoring of the crib with a Confirmation or
     // ManScoreSelection
     CribScore,

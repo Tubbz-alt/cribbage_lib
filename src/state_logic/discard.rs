@@ -32,7 +32,9 @@ mod test {
         game.deck = crate::deck::Deck::new();
 
         crate::state_logic::cut_initial::process_cut(&mut game).unwrap();
-
+        
+        // Reset the deck to a new, sorted deck such as to standardize the cards that are received
+        // by each player
         game.deck = crate::deck::Deck::new();
 
         crate::state_logic::deal::process_deal(&mut game).unwrap();
@@ -56,7 +58,7 @@ mod test {
             )
         );
 
-        // Test invalid number of indices4
+        // Test invalid number of indices
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![0], vec![0,1,2]];
         let expected_output: Vec<super::game_process_return::DiscardError> = vec![
             super::game_process_return::DiscardError::TwoCardsAreDiscardedWithTwoPlayers(0),
@@ -89,13 +91,12 @@ mod test {
 
         // Test valid input
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![0,1], vec![0,1]];
-        let mut expected_discards: Vec<crate::deck::Card>  = vec![
+        let expected_discards: Vec<crate::deck::Card>  = vec![
             game.players[0].hand[0],
             game.players[0].hand[1], 
             game.players[1].hand[0],
             game.players[1].hand[1]
         ];
-        expected_discards.sort();
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
         assert_eq!(game.crib, expected_discards);
         assert_eq!(game.state, crate::GameState::CutStarter);
@@ -148,13 +149,12 @@ mod test {
 
         // Test valid input
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![0,1], vec![0,1]];
-        let mut expected_discards: Vec<crate::deck::Card>  = vec![
+        let expected_discards: Vec<crate::deck::Card>  = vec![
             game.players[0].hand[0],
             game.players[0].hand[1], 
             game.players[1].hand[0],
             game.players[1].hand[1]
         ];
-        expected_discards.sort();
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
         assert_eq!(game.crib, expected_discards);
     }
@@ -207,14 +207,13 @@ mod test {
         // Test valid input
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![0,1], vec![0,1]];
         // One card is dealt directly to the crib in seven card cribbage
-        let mut expected_discards: Vec<crate::deck::Card>  = vec![
+        let expected_discards: Vec<crate::deck::Card>  = vec![
             game.players[0].hand[0],
             game.players[0].hand[1], 
             game.players[1].hand[0],
             game.players[1].hand[1],
             crate::util::return_card('2', 'D'),
         ];
-        expected_discards.sort();
 
         
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
@@ -273,13 +272,12 @@ mod test {
             let discard_indices_group: Vec<Vec<u8>> = vec![vec![0], vec![0], vec![0]];
             // The card dealt directly to the crib should be a three of diamonds with the sorted
             // debug deck
-            let mut expected_discards: Vec<crate::deck::Card>  = vec![
+            let expected_discards: Vec<crate::deck::Card>  = vec![
                 game.players[0].hand[0],
                 game.players[1].hand[0], 
                 game.players[2].hand[0],
                 crate::util::return_card('3', 'D')
             ];
-            expected_discards.sort();
             assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
             assert_eq!(game.crib, expected_discards);
         }
@@ -336,13 +334,12 @@ mod test {
             let discard_indices_group: Vec<Vec<u8>> = vec![vec![0], vec![0], vec![0], vec![0]];
             // The card dealt directly to the crib should be a three of diamonds with the sorted
             // debug deck
-            let mut expected_discards: Vec<crate::deck::Card>  = vec![
+            let expected_discards: Vec<crate::deck::Card>  = vec![
                 game.players[0].hand[0],
                 game.players[1].hand[0], 
                 game.players[2].hand[0],
                 game.players[3].hand[0],
             ];
-            expected_discards.sort();
             assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
             assert_eq!(game.crib, expected_discards);
         }
@@ -367,13 +364,12 @@ mod test {
 
         // Test valid config
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![], vec![0], vec![0], vec![0], vec![0]];
-        let mut expected_discards: Vec<crate::deck::Card> = vec![
+        let expected_discards: Vec<crate::deck::Card> = vec![
             game.players[1].hand[0],
             game.players[2].hand[0],
             game.players[3].hand[0],
             game.players[4].hand[0],
         ];
-        expected_discards.sort();
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
         assert_eq!(game.crib, expected_discards);
     }
@@ -399,13 +395,12 @@ mod test {
 
         // Test valid config
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![], vec![0], vec![0], vec![], vec![0], vec![0]];
-        let mut expected_discards: Vec<crate::deck::Card> = vec![
+        let expected_discards: Vec<crate::deck::Card> = vec![
             game.players[1].hand[0],
             game.players[2].hand[0],
             game.players[4].hand[0],
             game.players[5].hand[0],
         ];
-        expected_discards.sort();
         assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
         assert_eq!(game.crib, expected_discards);
     }
@@ -612,8 +607,6 @@ fn execute_discard(game: &mut crate::GameImpl, discard_indices_group: Vec<Vec<u8
                 }
             });
         }
-
-        game.crib.sort();
 
         game.state = crate::GameState::CutStarter;
     }
