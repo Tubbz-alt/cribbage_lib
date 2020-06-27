@@ -48,7 +48,6 @@ pub struct GameSettings {
     pub is_manual_scoring: bool,
     pub is_underpegging: bool,
     pub is_muggins: bool,
-    pub is_overpegging: bool,
     // A game where the first person to reach the threshold loses. This only works with variants
     // that only have two teams (such that there are not multiple winners) ie all the two player
     // variants, captain's cribbage, and four players in pairs

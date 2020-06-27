@@ -228,24 +228,14 @@ pub enum GameState {
     // Determines whether the dealer should receive points after calling or failing to call nibs
     // with the Nibs event; muggins does not apply for nibs so there is no muggins state here
     NibsCheck,
-    // Determines whether somebody contests the nibs call; this succeeds if the dealer calls nibs
-    // when there is not a jack or if the dealer did not call nibs when there is a jack in lowball
-    // mode
-    NibsContest,
     // Deals with the process of playing a single card received with a Play event
     PlayWaitForCard,
     // Deals with the scoring of the last card to be played in the PlayGroup automatically with a
     // Confirmation event or manually with a ManScoreSelection event
     PlayScore,
-    // Deals with whhether somebody contests any of the ScoreEvents processed in the PlayScore
-    // state; this succeeds if the active player overpegs or if the active player underpegs in
-    // lowball
-    PlayContest,
     // Deals with the calling of muggins of the last card to be played in the PlayGroup with a
     // Muggins event
     PlayMuggins,
-    // Deals with contesting a muggins call when overpegging is enabled
-    PlayMugginsContest,
     // Handles the creation of a new PlayGroup or the transition to the ShowScore state after the
     // play of cards is no longer possible for the current PlayGroup
     ResetPlay,

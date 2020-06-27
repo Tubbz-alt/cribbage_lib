@@ -19,7 +19,6 @@ mod test {
                     is_manual_scoring: false,
                     is_underpegging: false,
                     is_muggins: false,
-                    is_overpegging: false,
                     is_lowball: false,
                 }
             ),
@@ -38,7 +37,6 @@ mod test {
                     is_manual_scoring: false,
                     is_underpegging: false,
                     is_muggins: false,
-                    is_overpegging: false,
                     is_lowball: false,
                 }
             ),
@@ -72,7 +70,6 @@ mod test {
                     is_manual_scoring: false,
                     is_underpegging: false,
                     is_muggins: false,
-                    is_overpegging: false,
                     is_lowball: false,
                 };
 
@@ -211,7 +208,6 @@ mod test {
                     is_manual_scoring: false,
                     is_underpegging: false,
                     is_muggins: false,
-                    is_overpegging: false,
                     is_lowball: *option,
                 };
 
@@ -231,76 +227,58 @@ mod test {
         }
     }
 
-    // An error should be returned when underpegging, overpegging, or muggins are enabled when
+    // An error should be returned when underpegging or muggins are enabled when
     // manual scoring is not enabled, when muggins is enabled when underpegging is not enabled, or
-    // when muggins is enabled when lowball is enabled
+    // when underpegging is enabled when lowball is enabled
     #[test]
     fn settings_validity_boolean_flags() {
         let bool_options = vec![false, true];
         for man_option in &bool_options {
             for under_option in &bool_options {
                 for muggins_option in &bool_options {
-                    for over_option in &bool_options {
-                        for low_option in &bool_options {
-                            let settings = crate::settings::GameSettings {
-                                variant: crate::settings::RuleVariant::TwoStandard,
-                                victor_dealer_option:
-                                    crate::settings::VictorDealerOption::TwoPlayers,
-                                is_manual_scoring: *man_option,
-                                is_underpegging: *under_option,
-                                is_muggins: *muggins_option,
-                                is_overpegging: *over_option,
-                                is_lowball: *low_option,
-                            };
+                    for low_option in &bool_options {
+                        let settings = crate::settings::GameSettings {
+                            variant: crate::settings::RuleVariant::TwoStandard,
+                            victor_dealer_option: crate::settings::VictorDealerOption::TwoPlayers,
+                            is_manual_scoring: *man_option,
+                            is_underpegging: *under_option,
+                            is_muggins: *muggins_option,
+                            is_lowball: *low_option,
+                        };
 
-                            match (
-                                *man_option,
-                                *under_option,
-                                *muggins_option,
-                                *over_option,
-                                *low_option,
-                            ) {
-                                (false, true, _, _, _) => {
-                                    assert_eq!(super::check_settings_validity(settings),
+                        match (*man_option, *under_option, *muggins_option, *low_option) {
+                            (false, true, _, _) => {
+                                assert_eq!(super::check_settings_validity(settings),
                                     Err(crate::game_process_return::Error::GameStartInvalidConfig(
                                         crate::game_process_return::ConfigError::UnderpeggingEnabledWhenManualScoringIsDisabled
                                     ))
                                 );
-                                }
-                                (false, _, _, true, _) => {
-                                    assert_eq!(super::check_settings_validity(settings),
-                                    Err(crate::game_process_return::Error::GameStartInvalidConfig(
-                                        crate::game_process_return::ConfigError::OverpeggingEnabledWhenManualScoringIsDisabled
-                                    ))
-                                );
-                                }
-                                (false, _, true, _, _) => {
-                                    assert_eq!(super::check_settings_validity(settings),
+                            }
+                            (false, _, true, _) => {
+                                assert_eq!(super::check_settings_validity(settings),
                                     Err(crate::game_process_return::Error::GameStartInvalidConfig(
                                         crate::game_process_return::ConfigError::MugginsEnabledWhenManualScoringIsDisabled
                                     ))
                                 );
-                                }
-                                (true, false, true, _, _) => {
-                                    assert_eq!(super::check_settings_validity(settings),
+                            }
+                            (true, false, true, _) => {
+                                assert_eq!(super::check_settings_validity(settings),
                                     Err(crate::game_process_return::Error::GameStartInvalidConfig(
                                         crate::game_process_return::ConfigError::MugginsEnabledWhenUnderpeggingIsDisabled
                                     ))
                                 );
-                                }
-                                (_, _, true, _, true) => {
-                                    assert_eq!(super::check_settings_validity(settings),
+                            }
+                            (_, true, _, true) => {
+                                assert_eq!(super::check_settings_validity(settings),
                                     Err(crate::game_process_return::Error::GameStartInvalidConfig(
-                                            crate::game_process_return::ConfigError::MugginsIsEnabledWhenLowballIsEnabled
+                                        crate::game_process_return::ConfigError::LowballIsEnabledWhenUnderpeggingIsEnabled
                                     ))
                                 );
-                                }
-
-                                _ => {
-                                    assert_eq!(super::check_settings_validity(settings), Ok(()));
-                                }
-                            };
-                        }
+                            }
+                            _ => {
+                                assert_eq!(super::check_settings_validity(settings), Ok(()));
+                            }
+                        };
                     }
                 }
             }
@@ -317,7 +295,6 @@ mod test {
             is_manual_scoring: false,
             is_underpegging: false,
             is_muggins: false,
-            is_overpegging: false,
             is_lowball: false,
         });
 
@@ -516,16 +493,12 @@ fn check_settings_validity(
         ));
     }
 
-    // Ensure underpegging, overpegging, and muggins are only enabled when manual scoring is
+    // Ensure underpegging and muggins are only enabled when manual scoring is
     // enabled
     if !settings.is_manual_scoring {
         if settings.is_underpegging {
             return Err(game_process_return::Error::GameStartInvalidConfig(
                 game_process_return::ConfigError::UnderpeggingEnabledWhenManualScoringIsDisabled,
-            ));
-        } else if settings.is_overpegging {
-            return Err(game_process_return::Error::GameStartInvalidConfig(
-                game_process_return::ConfigError::OverpeggingEnabledWhenManualScoringIsDisabled,
             ));
         } else if settings.is_muggins {
             return Err(game_process_return::Error::GameStartInvalidConfig(
@@ -541,11 +514,10 @@ fn check_settings_validity(
         ));
     }
 
-    // Muggins just doesn't really work in lowball, just leave it as overpegging it or underpegging
-    // it and allowing players to contest that underpegging
-    if settings.is_muggins && settings.is_lowball {
+    // Muggins just doesn't really work with underpegging underpegging
+    if settings.is_underpegging && settings.is_lowball {
         return Err(game_process_return::Error::GameStartInvalidConfig(
-            game_process_return::ConfigError::MugginsIsEnabledWhenLowballIsEnabled,
+            game_process_return::ConfigError::LowballIsEnabledWhenUnderpeggingIsEnabled,
         ));
     }
 

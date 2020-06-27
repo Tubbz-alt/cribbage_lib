@@ -28,7 +28,6 @@ mod test {
             is_manual_scoring: false,
             is_underpegging: false,
             is_muggins: false,
-            is_overpegging: false,
             is_lowball: false,
         };
 

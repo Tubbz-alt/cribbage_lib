@@ -23,7 +23,6 @@ mod test {
             is_manual_scoring: false,
             is_underpegging: false,
             is_muggins: false,
-            is_overpegging: false,
             is_lowball: false,
         };
 
@@ -208,11 +207,11 @@ mod test {
         let discard_indices_group: Vec<Vec<u8>> = vec![vec![0,1], vec![0,1]];
         // One card is dealt directly to the crib in seven card cribbage
         let expected_discards: Vec<crate::deck::Card>  = vec![
+            crate::util::return_card('2', 'D'),
             game.players[0].hand[0],
             game.players[0].hand[1], 
             game.players[1].hand[0],
             game.players[1].hand[1],
-            crate::util::return_card('2', 'D'),
         ];
 
         
@@ -272,12 +271,13 @@ mod test {
             let discard_indices_group: Vec<Vec<u8>> = vec![vec![0], vec![0], vec![0]];
             // The card dealt directly to the crib should be a three of diamonds with the sorted
             // debug deck
-            let expected_discards: Vec<crate::deck::Card>  = vec![
+            let mut expected_discards: Vec<crate::deck::Card>  = vec![
+                crate::util::return_card('3', 'D'),
                 game.players[0].hand[0],
                 game.players[1].hand[0], 
                 game.players[2].hand[0],
-                crate::util::return_card('3', 'D')
             ];
+
             assert_eq!(super::process_discard(&mut game, discard_indices_group), Ok(super::game_process_return::Success::Discard));
             assert_eq!(game.crib, expected_discards);
         }

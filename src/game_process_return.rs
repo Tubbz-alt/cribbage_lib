@@ -3,14 +3,13 @@ pub enum ConfigError {
     UnderpeggingEnabledWhenManualScoringIsDisabled,
     MugginsEnabledWhenManualScoringIsDisabled,
     MugginsEnabledWhenUnderpeggingIsDisabled,
-    OverpeggingEnabledWhenManualScoringIsDisabled,
     VDOIsNotTwoPlayersWhenVariantIsTwoPlayers,
     VDOIsTwoPlayersWhenVariantIsMoreThanTwoPlayers,
     VDOIsNotCaptainDealsWhenVariantIsThreeCaptain,
     VDOIsCaptainDealsWhenVariantIsNotThreeCaptain,
     VDOIsNotLoserDrawsForDealerWhenVariantHasPairs,
     LowballEnabledWhenVariantIsNotTwoPlayersOrPairs,
-    MugginsIsEnabledWhenLowballIsEnabled,
+    LowballIsEnabledWhenUnderpeggingIsEnabled,
 }
 
 #[derive(Debug, PartialEq)]
@@ -63,6 +62,7 @@ pub enum ImplError {
 #[derive(Debug, PartialEq)]
 pub enum NibsError {
     NoNibsCallWhenUnderscoringIsDisabled,
+    NibsCallWhenNoCutJack,
     InvalidScoreEventToNibsCheck,
 }
 

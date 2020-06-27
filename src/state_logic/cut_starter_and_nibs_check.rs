@@ -7,8 +7,7 @@ mod test {
         is_partner: bool,
         is_man: bool,
         is_under: bool,
-        is_over: bool,
-        is_low: bool,
+        is_mug: bool,
     ) -> crate::GameImpl {
         let mut game = crate::GameImpl::new();
         game.is_debug = true;
@@ -18,9 +17,8 @@ mod test {
             victor_dealer_option: crate::settings::VictorDealerOption::TwoPlayers,
             is_manual_scoring: is_man,
             is_underpegging: is_under,
-            is_muggins: if is_under && is_low { true } else { false },
-            is_overpegging: is_over,
-            is_lowball: is_low,
+            is_muggins: is_mug,
+            is_lowball: false,
         };
 
         crate::state_logic::game_start::game_setup(&mut game, settings).unwrap();
@@ -50,8 +48,8 @@ mod test {
 
     mod automatic_scoring {
         #[test]
-        fn process_cut_without_underpegging_no_nibs() {
-            let mut game = super::set_up_game(false, false, false, false, false);
+        fn process_cut_no_nibs() {
+            let mut game = super::set_up_game(false, false, false, false);
             assert_eq!(
                 super::super::process_cut(&mut game),
                 Ok(crate::game_process_return::Success::StarterCut)
@@ -62,8 +60,8 @@ mod test {
         }
 
         #[test]
-        fn process_cut_without_underpegging_nibs_no_partner() {
-            let mut game = super::set_up_game(false, false, false, false, false);
+        fn process_cut_nibs_no_partner() {
+            let mut game = super::set_up_game(false, false, false, false);
             // Set the deck to contain only the Jack of hearts
             game.deck = crate::deck::Deck::from_vec(vec![crate::util::return_card('J', 'H')]);
 
@@ -77,8 +75,8 @@ mod test {
         }
 
         #[test]
-        fn process_cut_without_underpegging_nibs_and_win_no_partner() {
-            let mut game = super::set_up_game(false, false, false, false, false);
+        fn process_cut_nibs_and_win_no_partner() {
+            let mut game = super::set_up_game(false, false, false, false);
             game.deck = crate::deck::Deck::from_vec(vec![crate::util::return_card('J', 'H')]);
             game.players[0].change_score(120);
 
@@ -92,8 +90,8 @@ mod test {
         }
 
         #[test]
-        fn process_cut_without_underpegging_nibs_with_partner() {
-            let mut game = super::set_up_game(true, false, false, false, false);
+        fn process_cut_nibs_with_partner() {
+            let mut game = super::set_up_game(true, false, false, false);
             game.deck = crate::deck::Deck::from_vec(vec![crate::util::return_card('J', 'H')]);
 
             assert_eq!(
@@ -107,8 +105,8 @@ mod test {
         }
 
         #[test]
-        fn process_cut_without_underpegging_nibs_and_win_with_partner() {
-            let mut game = super::set_up_game(true, false, false, false, false);
+        fn process_cut_nibs_and_win_with_partner() {
+            let mut game = super::set_up_game(true, false, false, false);
             game.deck = crate::deck::Deck::from_vec(vec![crate::util::return_card('J', 'H')]);
             game.players[0].change_score(120);
             game.players[1].change_score(120);
@@ -124,195 +122,162 @@ mod test {
     }
 
     mod manual_scoring {
+        use super::super::{process_cut, process_nibs};
+        use super::set_up_game;
+
         #[test]
-        fn process_cut_with_underpegging() {
-            let mut game = super::set_up_game(false, true, false, false, false);
+        fn process_cut_with_manual_scoring() {
+            let mut game = set_up_game(false, true, false, false);
             assert_eq!(
-                super::super::process_cut(&mut game),
+                process_cut(&mut game),
                 Ok(crate::game_process_return::Success::StarterCut)
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
             assert_eq!(game.state, crate::GameState::NibsCheck);
         }
 
-        mod lowball {}
+        #[test]
+        fn process_nibs_no_nibs() {
+            let mut game = set_up_game(false, true, false, false);
+            process_cut(&mut game).unwrap();
+            assert_eq!(
+                process_nibs(&mut game, None),
+                Ok(crate::game_process_return::Success::NibsCheck)
+            );
+            assert_eq!(game.state, crate::GameState::PlayWaitForCard);
+        }
 
-        mod notlowball {
+        #[test]
+        fn process_nibs_nibs_but_not_claimed_underpegging_disabled() {
+            let mut game = set_up_game(false, true, false, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
+            assert_eq!(
+                process_nibs(&mut game, None),
+                Err(crate::game_process_return::Error::NibsCallError(
+                    crate::game_process_return::NibsError::NoNibsCallWhenUnderscoringIsDisabled
+                ))
+            );
+            assert_eq!(game.state, crate::GameState::NibsCheck);
+        }
 
-            mod no_overpegging {
-                use super::super::super::super::{process_cut, process_nibs};
-                use super::super::super::set_up_game;
+        #[test]
+        fn process_nibs_nibs_but_not_claimed_underpegging_enabled() {
+            let mut game = set_up_game(false, true, true, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
+            assert_eq!(
+                process_nibs(&mut game, None),
+                Ok(crate::game_process_return::Success::NibsCheck)
+            );
+            assert_eq!(game.players[0].front_peg_pos, 0);
+            assert_eq!(game.state, crate::GameState::PlayWaitForCard);
+        }
 
-                #[test]
-                fn process_nibs_no_nibs() {
-                    let mut game = set_up_game(false, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    assert_eq!(
-                        process_nibs(&mut game, None),
-                        Ok(crate::game_process_return::Success::NibsCheck)
-                    );
-                    assert_eq!(game.state, crate::GameState::PlayWaitForCard);
-                }
+        #[test]
+        fn process_nibs_nibs_no_partner() {
+            let mut game = set_up_game(false, true, false, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
 
-                #[test]
-                fn process_nibs_nibs_but_not_claimed_underpegging_disabled() {
-                    let mut game = set_up_game(false, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
-                    assert_eq!(
-                    process_nibs(&mut game, None),
-                    Err(crate::game_process_return::Error::NibsCallError(
-                        crate::game_process_return::NibsError::NoNibsCallWhenUnderscoringIsDisabled
-                    ))
-                );
-                    assert_eq!(game.state, crate::GameState::NibsCheck);
-                }
+            let score_event = crate::score::ScoreEvent {
+                score_type: crate::score::ScoreType::Play(crate::score::PlayScoreType::Nibs),
+                player_index: 0,
+                point_value: 2,
+            };
 
-                #[test]
-                fn process_nibs_nibs_but_not_claimed_underpegging_enabled() {
-                    let mut game = set_up_game(false, true, true, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
-                    assert_eq!(
-                        process_nibs(&mut game, None),
-                        Ok(crate::game_process_return::Success::NibsCheck)
-                    );
-                    assert_eq!(game.players[0].front_peg_pos, 0);
-                    assert_eq!(game.state, crate::GameState::PlayWaitForCard);
-                }
+            assert_eq!(
+                process_nibs(&mut game, Some(score_event)),
+                Ok(crate::game_process_return::Success::NibsCheck)
+            );
+            assert_eq!(game.players[0].front_peg_pos, 2);
+            assert_eq!(game.state, crate::GameState::PlayWaitForCard);
+        }
 
-                #[test]
-                fn process_nibs_nibs_no_partner() {
-                    let mut game = set_up_game(false, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
+        #[test]
+        fn process_nibs_nibs_and_win_no_partner() {
+            let mut game = set_up_game(false, true, false, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
+            game.players[0].change_score(119);
 
-                    let score_event = crate::score::ScoreEvent {
-                        score_type: crate::score::ScoreType::Play(
-                            crate::score::PlayScoreType::Nibs,
-                        ),
-                        player_index: 0,
-                        point_value: 2,
-                    };
+            let score_event = crate::score::ScoreEvent {
+                score_type: crate::score::ScoreType::Play(crate::score::PlayScoreType::Nibs),
+                player_index: 0,
+                point_value: 2,
+            };
 
-                    assert_eq!(
-                        process_nibs(&mut game, Some(score_event)),
-                        Ok(crate::game_process_return::Success::NibsCheck)
-                    );
-                    assert_eq!(game.players[0].front_peg_pos, 2);
-                    assert_eq!(game.state, crate::GameState::PlayWaitForCard);
-                }
+            assert_eq!(
+                process_nibs(&mut game, Some(score_event)),
+                Ok(crate::game_process_return::Success::NibsCheck)
+            );
+            assert_eq!(game.players[0].front_peg_pos, 121);
+            assert_eq!(game.state, crate::GameState::Win);
+        }
 
-                #[test]
-                fn process_nibs_nibs_and_win_no_partner() {
-                    let mut game = set_up_game(false, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
-                    game.players[0].change_score(119);
+        #[test]
+        fn process_nibs_nibs_invalid_call() {
+            let mut game = set_up_game(false, true, false, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
 
-                    let score_event = crate::score::ScoreEvent {
-                        score_type: crate::score::ScoreType::Play(
-                            crate::score::PlayScoreType::Nibs,
-                        ),
-                        player_index: 0,
-                        point_value: 2,
-                    };
+            let score_event = crate::score::ScoreEvent {
+                score_type: crate::score::ScoreType::Play(crate::score::PlayScoreType::Nibs),
+                player_index: 0,
+                point_value: 3,
+            };
 
-                    assert_eq!(
-                        process_nibs(&mut game, Some(score_event)),
-                        Ok(crate::game_process_return::Success::NibsCheck)
-                    );
-                    assert_eq!(game.players[0].front_peg_pos, 121);
-                    assert_eq!(game.state, crate::GameState::Win);
-                }
+            assert_eq!(
+                process_nibs(&mut game, Some(score_event)),
+                Err(crate::game_process_return::Error::NibsCallError(
+                    crate::game_process_return::NibsError::InvalidScoreEventToNibsCheck
+                ))
+            );
+            assert_eq!(game.state, crate::GameState::NibsCheck);
+        }
 
-                #[test]
-                fn process_nibs_nibs_invalid_call() {
-                    let mut game = set_up_game(false, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
+        #[test]
+        fn process_nibs_nibs_with_partner() {
+            let mut game = set_up_game(true, true, false, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
 
-                    let score_event = crate::score::ScoreEvent {
-                        score_type: crate::score::ScoreType::Play(
-                            crate::score::PlayScoreType::Nibs,
-                        ),
-                        player_index: 0,
-                        point_value: 3,
-                    };
+            let score_event = crate::score::ScoreEvent {
+                score_type: crate::score::ScoreType::Play(crate::score::PlayScoreType::Nibs),
+                player_index: 0,
+                point_value: 2,
+            };
 
-                    assert_eq!(
-                        process_nibs(&mut game, Some(score_event)),
-                        Err(crate::game_process_return::Error::NibsCallError(
-                            crate::game_process_return::NibsError::InvalidScoreEventToNibsCheck
-                        ))
-                    );
-                    assert_eq!(game.state, crate::GameState::NibsCheck);
-                }
+            assert_eq!(
+                process_nibs(&mut game, Some(score_event)),
+                Ok(crate::game_process_return::Success::NibsCheck)
+            );
+            assert_eq!(game.players[0].front_peg_pos, 2);
+            assert_eq!(game.players[1].front_peg_pos, 2);
+            assert_eq!(game.state, crate::GameState::PlayWaitForCard);
+        }
 
-                #[test]
-                fn process_nibs_nibs_with_partner() {
-                    let mut game = set_up_game(true, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
+        #[test]
+        fn process_nibs_nibs_and_win_with_partner() {
+            let mut game = set_up_game(true, true, false, false);
+            process_cut(&mut game).unwrap();
+            game.starter_card = Some(crate::util::return_card('J', 'H'));
+            game.players[0].change_score(119);
+            game.players[1].change_score(119);
 
-                    let score_event = crate::score::ScoreEvent {
-                        score_type: crate::score::ScoreType::Play(
-                            crate::score::PlayScoreType::Nibs,
-                        ),
-                        player_index: 0,
-                        point_value: 2,
-                    };
+            let score_event = crate::score::ScoreEvent {
+                score_type: crate::score::ScoreType::Play(crate::score::PlayScoreType::Nibs),
+                player_index: 0,
+                point_value: 2,
+            };
 
-                    assert_eq!(
-                        process_nibs(&mut game, Some(score_event)),
-                        Ok(crate::game_process_return::Success::NibsCheck)
-                    );
-                    assert_eq!(game.players[0].front_peg_pos, 2);
-                    assert_eq!(game.players[1].front_peg_pos, 2);
-                    assert_eq!(game.state, crate::GameState::PlayWaitForCard);
-                }
-
-                #[test]
-                fn process_nibs_nibs_and_win_with_partner() {
-                    let mut game = set_up_game(true, true, false, false, false);
-                    process_cut(&mut game).unwrap();
-                    game.starter_card = Some(crate::util::return_card('J', 'H'));
-                    game.players[0].change_score(119);
-                    game.players[1].change_score(119);
-
-                    let score_event = crate::score::ScoreEvent {
-                        score_type: crate::score::ScoreType::Play(
-                            crate::score::PlayScoreType::Nibs,
-                        ),
-                        player_index: 0,
-                        point_value: 2,
-                    };
-
-                    assert_eq!(
-                        process_nibs(&mut game, Some(score_event)),
-                        Ok(crate::game_process_return::Success::NibsCheck)
-                    );
-                    assert_eq!(game.players[0].front_peg_pos, 121);
-                    assert_eq!(game.players[1].front_peg_pos, 121);
-                    assert_eq!(game.state, crate::GameState::Win);
-                }
-            }
-
-            mod overpegging {
-                use super::super::super::super::{process_cut, process_nibs};
-                use super::super::super::set_up_game;
-                #[test]
-                fn process_nibs_with_overpegging_no_nibs_claimed_no_player_contested() {}
-
-                #[test]
-                fn process_nibs_with_overpegging_no_nibs_claimed_with_player_contested() {}
-
-                #[test]
-                fn process_nibs_with_overpegging_no_nibs_claimed_no_player_not_contested() {}
-
-                #[test]
-                fn process_nibs_with_overpegging_no_nibs_claimed_with_player_not_contested() {}
-            }
+            assert_eq!(
+                process_nibs(&mut game, Some(score_event)),
+                Ok(crate::game_process_return::Success::NibsCheck)
+            );
+            assert_eq!(game.players[0].front_peg_pos, 121);
+            assert_eq!(game.players[1].front_peg_pos, 121);
+            assert_eq!(game.state, crate::GameState::Win);
         }
     }
 }
@@ -348,10 +313,9 @@ pub(crate) fn process_cut(
 }
 
 // Quick note: the ACC rules specify that you can't score points with muggins on the nibs
-// call; when lowball is enabled, the contest function will be used to force the dealer to take
-// points
+// call
 
-// When underpegging or overpegging is enabled, process whether the dealer calls nibs or not
+// When underpegging is enabled, process whether the dealer calls nibs or not
 pub(crate) fn process_nibs(
     game: &mut crate::GameImpl,
     call: Option<crate::score::ScoreEvent>,
@@ -406,11 +370,10 @@ pub(crate) fn process_nibs(
             if call.is_none() {
                 game.state = crate::GameState::PlayWaitForCard;
                 Ok(game_process_return::Success::NibsCheck)
-            }
-            // If the card is not a jack and there is a call, throw an error if overscoring is
-            // disabled or allow the call and proceed to the contest state
-            else {
-                Err(game_process_return::Error::UnimplementedState)
+            } else {
+                Err(game_process_return::Error::NibsCallError(
+                    game_process_return::NibsError::NibsCallWhenNoCutJack,
+                ))
             }
         }
     } else {
@@ -420,12 +383,5 @@ pub(crate) fn process_nibs(
     }
 }
 
-// When overpegging is enabled, process whether someone contests the nibs call
-pub(crate) fn process_nibs_contest(
-    game: &mut crate::GameImpl,
-    call: Option<crate::score::ScoreEvent>,
-) -> Result<game_process_return::Success, game_process_return::Error> {
-    Ok(game_process_return::Success::NibsContest)
-}
-
+// TODO Move to util
 fn ready_for_play() {}
