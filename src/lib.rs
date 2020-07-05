@@ -300,9 +300,6 @@ struct GameImpl {
     // Vector to hold the ScoreEvents remaining for muggins
     pub remaining_score_events: Vec<score::ScoreEvent>,
 
-    // Vector to hold the invalid ScoreEvents when overpegging is enabled
-    pub overpegged_score_events: Vec<score::ScoreEvent>,
-
     // Whether to reset the play phase of the game for when a 31 score is present
     pub reset_play: bool,
 
@@ -324,7 +321,6 @@ impl GameImpl {
             index_active: None,
             index_dealer: None,
             last_player_index: None,
-            overpegged_score_events: Vec::new(),
             play_groups: Vec::new(),
             players: Vec::new(),
             remaining_score_events: Vec::new(),

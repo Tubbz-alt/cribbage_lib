@@ -58,8 +58,11 @@ mod test {
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
 
             // Cut should end with the index_active set to the pone next to the dealer
-            // ((dealer+1)%num_players)
+            // ((dealer+1)%num_players) and the play_groups to contain one empty vector of cards
             assert_eq!(game.index_active, Some(1));
+            assert_eq!(game.play_groups.len(), 1);
+            assert_eq!(game.play_groups[0].cards.len(), 0);
+            assert_eq!(game.play_groups[0].total, 0);
 
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
@@ -77,6 +80,9 @@ mod test {
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 2);
             assert_eq!(game.index_active, Some(1));
+            assert_eq!(game.play_groups.len(), 1);
+            assert_eq!(game.play_groups[0].cards.len(), 0);
+            assert_eq!(game.play_groups[0].total, 0);
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
 
@@ -93,6 +99,9 @@ mod test {
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 122);
             assert_eq!(game.index_active, Some(1));
+            assert_eq!(game.play_groups.len(), 1);
+            assert_eq!(game.play_groups[0].cards.len(), 0);
+            assert_eq!(game.play_groups[0].total, 0);
             assert_eq!(game.state, crate::GameState::Win);
         }
 
@@ -109,6 +118,9 @@ mod test {
             assert_eq!(game.players[0].front_peg_pos, 2);
             assert_eq!(game.players[1].front_peg_pos, 2);
             assert_eq!(game.index_active, Some(1));
+            assert_eq!(game.play_groups.len(), 1);
+            assert_eq!(game.play_groups[0].cards.len(), 0);
+            assert_eq!(game.play_groups[0].total, 0);
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
 
@@ -126,6 +138,9 @@ mod test {
             assert_eq!(game.players[0].front_peg_pos, 122);
             assert_eq!(game.players[1].front_peg_pos, 122);
             assert_eq!(game.index_active, Some(1));
+            assert_eq!(game.play_groups.len(), 1);
+            assert_eq!(game.play_groups[0].cards.len(), 0);
+            assert_eq!(game.play_groups[0].total, 0);
             assert_eq!(game.state, crate::GameState::Win);
         }
     }
@@ -143,6 +158,9 @@ mod test {
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
             assert_eq!(game.index_active, Some(1));
+            assert_eq!(game.play_groups.len(), 1);
+            assert_eq!(game.play_groups[0].cards.len(), 0);
+            assert_eq!(game.play_groups[0].total, 0);
             assert_eq!(game.state, crate::GameState::NibsCheck);
         }
 
@@ -319,6 +337,12 @@ pub(crate) fn process_cut(
     // (dealer_index+1)%num_players) of the dealer
     game.index_active = Some((game.index_dealer.unwrap() + 1) % game.players.len() as u8);
 
+    // Set the play_groups to contain one empty vector
+    game.play_groups = vec![crate::PlayGroup {
+        total: 0,
+        cards: Vec::new(),
+    }];
+
     Ok(game_process_return::Success::StarterCut)
 }
 
@@ -385,6 +409,3 @@ pub(crate) fn process_nibs(
         ))
     }
 }
-
-// TODO Move to util
-fn ready_for_play() {}
