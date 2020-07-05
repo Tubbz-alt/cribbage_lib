@@ -85,13 +85,25 @@ pub enum InitialCutReturn {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum StarterCutReturn {
+    ManualScoring,
+    AutoNibs,
+    AutoNoNibs,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum NibsCheckReturn {
+    Nibs,
+    NoNibs,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Success {
     GameStart,
     InitialCut(InitialCutReturn),
     Deal,
     Sort,
     Discard,
-    StarterCut,
-    NibsCheck,
-    NibsContest,
+    StarterCut(StarterCutReturn),
+    NibsCheck(NibsCheckReturn),
 }

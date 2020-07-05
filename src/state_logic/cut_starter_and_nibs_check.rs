@@ -52,7 +52,9 @@ mod test {
             let mut game = super::set_up_game(false, false, false, false);
             assert_eq!(
                 super::super::process_cut(&mut game),
-                Ok(crate::game_process_return::Success::StarterCut)
+                Ok(crate::game_process_return::Success::StarterCut(
+                    crate::game_process_return::StarterCutReturn::AutoNoNibs
+                ))
             );
             // AH to QH are dealt to the players with the debug deck
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
@@ -75,7 +77,9 @@ mod test {
 
             assert_eq!(
                 super::super::process_cut(&mut game),
-                Ok(crate::game_process_return::Success::StarterCut)
+                Ok(crate::game_process_return::Success::StarterCut(
+                    crate::game_process_return::StarterCutReturn::AutoNibs
+                ))
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 2);
@@ -94,7 +98,9 @@ mod test {
 
             assert_eq!(
                 super::super::process_cut(&mut game),
-                Ok(crate::game_process_return::Success::StarterCut)
+                Ok(crate::game_process_return::Success::StarterCut(
+                    crate::game_process_return::StarterCutReturn::AutoNibs
+                ))
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 122);
@@ -112,7 +118,9 @@ mod test {
 
             assert_eq!(
                 super::super::process_cut(&mut game),
-                Ok(crate::game_process_return::Success::StarterCut)
+                Ok(crate::game_process_return::Success::StarterCut(
+                    crate::game_process_return::StarterCutReturn::AutoNibs
+                ))
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 2);
@@ -132,7 +140,9 @@ mod test {
             game.players[1].change_score(120);
             assert_eq!(
                 super::super::process_cut(&mut game),
-                Ok(crate::game_process_return::Success::StarterCut)
+                Ok(crate::game_process_return::Success::StarterCut(
+                    crate::game_process_return::StarterCutReturn::AutoNibs
+                ))
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 122);
@@ -154,7 +164,9 @@ mod test {
             let mut game = set_up_game(false, true, false, false);
             assert_eq!(
                 process_cut(&mut game),
-                Ok(crate::game_process_return::Success::StarterCut)
+                Ok(crate::game_process_return::Success::StarterCut(
+                    crate::game_process_return::StarterCutReturn::ManualScoring
+                ))
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
             assert_eq!(game.index_active, Some(1));
@@ -170,7 +182,9 @@ mod test {
             process_cut(&mut game).unwrap();
             assert_eq!(
                 process_nibs(&mut game, None),
-                Ok(crate::game_process_return::Success::NibsCheck)
+                Ok(crate::game_process_return::Success::NibsCheck(
+                    crate::game_process_return::NibsCheckReturn::NoNibs
+                ))
             );
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
@@ -196,7 +210,9 @@ mod test {
             game.starter_card = Some(crate::util::return_card('J', 'H'));
             assert_eq!(
                 process_nibs(&mut game, None),
-                Ok(crate::game_process_return::Success::NibsCheck)
+                Ok(crate::game_process_return::Success::NibsCheck(
+                    crate::game_process_return::NibsCheckReturn::NoNibs
+                ))
             );
             assert_eq!(game.players[0].front_peg_pos, 0);
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
@@ -216,7 +232,9 @@ mod test {
 
             assert_eq!(
                 process_nibs(&mut game, Some(score_event)),
-                Ok(crate::game_process_return::Success::NibsCheck)
+                Ok(crate::game_process_return::Success::NibsCheck(
+                    crate::game_process_return::NibsCheckReturn::Nibs
+                ))
             );
             assert_eq!(game.players[0].front_peg_pos, 2);
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
@@ -237,7 +255,9 @@ mod test {
 
             assert_eq!(
                 process_nibs(&mut game, Some(score_event)),
-                Ok(crate::game_process_return::Success::NibsCheck)
+                Ok(crate::game_process_return::Success::NibsCheck(
+                    crate::game_process_return::NibsCheckReturn::Nibs
+                ))
             );
             assert_eq!(game.players[0].front_peg_pos, 121);
             assert_eq!(game.state, crate::GameState::Win);
@@ -278,7 +298,9 @@ mod test {
 
             assert_eq!(
                 process_nibs(&mut game, Some(score_event)),
-                Ok(crate::game_process_return::Success::NibsCheck)
+                Ok(crate::game_process_return::Success::NibsCheck(
+                    crate::game_process_return::NibsCheckReturn::Nibs
+                ))
             );
             assert_eq!(game.players[0].front_peg_pos, 2);
             assert_eq!(game.players[1].front_peg_pos, 2);
@@ -301,7 +323,9 @@ mod test {
 
             assert_eq!(
                 process_nibs(&mut game, Some(score_event)),
-                Ok(crate::game_process_return::Success::NibsCheck)
+                Ok(crate::game_process_return::Success::NibsCheck(
+                    crate::game_process_return::NibsCheckReturn::Nibs
+                ))
             );
             assert_eq!(game.players[0].front_peg_pos, 121);
             assert_eq!(game.players[1].front_peg_pos, 121);
@@ -314,11 +338,15 @@ mod test {
 pub(crate) fn process_cut(
     game: &mut crate::GameImpl,
 ) -> Result<game_process_return::Success, game_process_return::Error> {
+    let starter_cut_return;
+
     game.starter_card = Some(game.deck.deal());
 
     // If the cut card is a jack, the dealer scores two points
     if !game.settings.unwrap().is_manual_scoring {
         if crate::deck::return_value(game.starter_card.unwrap()) == 11 {
+            starter_cut_return = game_process_return::StarterCutReturn::AutoNibs;
+
             let dealer_index: usize = game.index_dealer.unwrap() as usize;
             // process_score adds points to the dealer and their partner if they have one; if it
             // returns true then it has set the state to Win and if it returns false continue the
@@ -327,9 +355,11 @@ pub(crate) fn process_cut(
                 game.state = crate::GameState::PlayWaitForCard;
             }
         } else {
+            starter_cut_return = game_process_return::StarterCutReturn::AutoNoNibs;
             game.state = crate::GameState::PlayWaitForCard;
         }
     } else {
+        starter_cut_return = game_process_return::StarterCutReturn::ManualScoring;
         game.state = crate::GameState::NibsCheck;
     }
 
@@ -343,7 +373,7 @@ pub(crate) fn process_cut(
         cards: Vec::new(),
     }];
 
-    Ok(game_process_return::Success::StarterCut)
+    Ok(game_process_return::Success::StarterCut(starter_cut_return))
 }
 
 // Quick note: the ACC rules specify that you can't score points with muggins on the nibs
@@ -365,7 +395,9 @@ pub(crate) fn process_nibs(
                     ))
                 } else {
                     game.state = crate::GameState::PlayWaitForCard;
-                    Ok(game_process_return::Success::NibsCheck)
+                    Ok(game_process_return::Success::NibsCheck(
+                        game_process_return::NibsCheckReturn::NoNibs,
+                    ))
                 }
             }
             // If the starter card is a jack and there is a Nibs call, check that the score event
@@ -384,7 +416,9 @@ pub(crate) fn process_nibs(
                     if !crate::util::process_score(game, index_dealer, 2) {
                         game.state = crate::GameState::PlayWaitForCard;
                     }
-                    Ok(game_process_return::Success::NibsCheck)
+                    Ok(game_process_return::Success::NibsCheck(
+                        game_process_return::NibsCheckReturn::Nibs,
+                    ))
                 } else {
                     Err(game_process_return::Error::NibsCallError(
                         game_process_return::NibsError::InvalidScoreEventToNibsCheck,
@@ -396,7 +430,9 @@ pub(crate) fn process_nibs(
             // state
             if call.is_none() {
                 game.state = crate::GameState::PlayWaitForCard;
-                Ok(game_process_return::Success::NibsCheck)
+                Ok(game_process_return::Success::NibsCheck(
+                    game_process_return::NibsCheckReturn::NoNibs,
+                ))
             } else {
                 Err(game_process_return::Error::NibsCallError(
                     game_process_return::NibsError::NibsCallWhenNoCutJack,

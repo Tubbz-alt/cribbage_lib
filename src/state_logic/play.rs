@@ -23,3 +23,5 @@ mod test {
     // or transition the game to the ShowScore state
     mod reset_play {}
 }
+
+fn play_card(game: &mut crate::GameImpl, play_turn: crate::PlayTurn) {}
