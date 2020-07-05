@@ -56,6 +56,11 @@ mod test {
             );
             // AH to QH are dealt to the players with the debug deck
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
+
+            // Cut should end with the index_active set to the pone next to the dealer
+            // ((dealer+1)%num_players)
+            assert_eq!(game.index_active, Some(1));
+
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
 
@@ -71,6 +76,7 @@ mod test {
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 2);
+            assert_eq!(game.index_active, Some(1));
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
 
@@ -86,6 +92,7 @@ mod test {
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 122);
+            assert_eq!(game.index_active, Some(1));
             assert_eq!(game.state, crate::GameState::Win);
         }
 
@@ -101,6 +108,7 @@ mod test {
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 2);
             assert_eq!(game.players[1].front_peg_pos, 2);
+            assert_eq!(game.index_active, Some(1));
             assert_eq!(game.state, crate::GameState::PlayWaitForCard);
         }
 
@@ -117,6 +125,7 @@ mod test {
             assert_eq!(game.starter_card, Some(crate::util::return_card('J', 'H')));
             assert_eq!(game.players[0].front_peg_pos, 122);
             assert_eq!(game.players[1].front_peg_pos, 122);
+            assert_eq!(game.index_active, Some(1));
             assert_eq!(game.state, crate::GameState::Win);
         }
     }
@@ -133,6 +142,7 @@ mod test {
                 Ok(crate::game_process_return::Success::StarterCut)
             );
             assert_eq!(game.starter_card, Some(crate::util::return_card('K', 'H')));
+            assert_eq!(game.index_active, Some(1));
             assert_eq!(game.state, crate::GameState::NibsCheck);
         }
 
@@ -292,6 +302,9 @@ pub(crate) fn process_cut(
     if !game.settings.unwrap().is_manual_scoring {
         if crate::deck::return_value(game.starter_card.unwrap()) == 11 {
             let dealer_index: usize = game.index_dealer.unwrap() as usize;
+            // process_score adds points to the dealer and their partner if they have one; if it
+            // returns true then it has set the state to Win and if it returns false continue the
+            // game by setting the state to PlayWaitForCard
             if !crate::util::process_score(game, dealer_index, 2) {
                 game.state = crate::GameState::PlayWaitForCard;
             }
@@ -301,6 +314,10 @@ pub(crate) fn process_cut(
     } else {
         game.state = crate::GameState::NibsCheck;
     }
+
+    // Set the index_active to the pone to the left (I guess, the pone to the
+    // (dealer_index+1)%num_players) of the dealer
+    game.index_active = Some((game.index_dealer.unwrap() + 1) % game.players.len() as u8);
 
     Ok(game_process_return::Success::StarterCut)
 }
