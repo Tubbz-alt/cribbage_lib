@@ -217,6 +217,65 @@ mod test {
                 ))
             );
         }
+
+        // Test that one can not play a card that brings the PlayGroup total over 31
+        #[test]
+        fn test_maximum_play_group_total() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            game.play_groups[0].total = 31;
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Err(game_process_return::Error::PlayWaitForCardError(
+                    game_process_return::PlayTurnError::PlayGroupTotalMayNotExceed31
+                ))
+            );
+        }
+
+        // Test that one can not go when they have a card that they could put down
+        #[test]
+        fn test_invalid_go() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::Go),
+                Err(game_process_return::Error::PlayWaitForCardError(
+                    game_process_return::PlayTurnError::MustPlayCardIfAble
+                ))
+            );
+        }
+
+        // Test that play_card accepts a Go when the active player has no cards that wouldn't bring
+        // the total over 31
+        #[test]
+        fn test_valid_go() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            game.play_groups[0].total = 31;
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::Go),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+        }
     }
 
     // State that processes a ScoreEvent for when manual scoring is enabled
@@ -266,22 +325,53 @@ pub(crate) fn play_card(
             ));
         }
 
+        let card = game.players[game.index_active.unwrap() as usize].hand[index as usize];
+
+        // Return an error if the card would bring the play total over 31
+        if game.play_groups.last().unwrap().total + crate::deck::return_play_value(card) > 31 {
+            return Err(game_process_return::Error::PlayWaitForCardError(
+                game_process_return::PlayTurnError::PlayGroupTotalMayNotExceed31,
+            ));
+        }
+
         // Update the last PlayGroup to include the given card index and add the value to the
         // PlayGroup total
-        let card = game.players[game.index_active.unwrap() as usize].hand[index as usize];
         game.play_groups.last_mut().unwrap().cards.push(card);
         game.play_groups.last_mut().unwrap().total += crate::deck::return_play_value(card);
-    } else {
-    }
 
-    if game.settings.unwrap().is_manual_scoring {
-        game.state = crate::GameState::PlayScore;
-        Ok(game_process_return::Success::PlayWaitForCard(
-            game_process_return::PlayWaitForCardReturn::ManualScoring,
-        ))
-    } else {
-        game.index_active = Some((game.index_active.unwrap() + 1) % game.players.len() as u8);
-        // TODO Actually check the scoring
+        if game.settings.unwrap().is_manual_scoring {
+            game.state = crate::GameState::PlayScore;
+
+            Ok(game_process_return::Success::PlayWaitForCard(
+                game_process_return::PlayWaitForCardReturn::ManualScoring,
+            ))
+        } else {
+            game.index_active = Some((game.index_active.unwrap() + 1) % game.players.len() as u8);
+
+            Ok(game_process_return::Success::PlayWaitForCard(
+                game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![]),
+            ))
+        }
+    }
+    // When the PlayTurn is Go
+    else {
+        // For every card in the player's hand that has not already been played
+        for (index, card) in game.players[game.index_active.unwrap() as usize]
+            .hand
+            .iter()
+            .enumerate()
+        {
+            if !has_card_been_played(game, index as u8) {
+                if game.play_groups.last().unwrap().total + crate::deck::return_play_value(*card)
+                    <= 31
+                {
+                    return Err(game_process_return::Error::PlayWaitForCardError(
+                        game_process_return::PlayTurnError::MustPlayCardIfAble,
+                    ));
+                }
+            }
+        }
+
         Ok(game_process_return::Success::PlayWaitForCard(
             game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![]),
         ))
