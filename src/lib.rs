@@ -203,11 +203,11 @@ impl Game {
     }
 }
 
-// Enum for the event sent during the play phase of the game; simply a selection of the card to be
+// Enum for the event sent during the play phase of the game; simply a selection of the card index to be
 // played or a Go if no card play is possible
 #[derive(Debug, Clone, Copy)]
 pub enum PlayTurn {
-    CardSelected(deck::Card),
+    CardSelected(u8),
     Go,
 }
 
@@ -260,7 +260,7 @@ pub enum GameState {
 }
 
 // Object representing the cards played in one of the groups of 31 or less
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PlayGroup {
     total: u8,
     cards: Vec<deck::Card>,

@@ -67,6 +67,17 @@ pub enum NibsError {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum PlayTurnError {
+    CardHasAlreadyBeenPlayed,
+    IndexIsBetween0And2InclusiveWithTwoFiveCard,
+    IndexIsBetween0And4InclusiveWithTwoSevenCard,
+    // This is true for all other variants
+    IndexIsBetween0And3InclusiveWithThisRuleVariant,
+    MustPlayCardIfAble,
+    PlayGroupTotalMayNotExceed31,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Error {
     ImplementationError(ImplError),
     ExpectedEvent(Vec<Event>),
@@ -74,6 +85,7 @@ pub enum Error {
     InitialCutError,
     DiscardErrors(Vec<DiscardError>),
     NibsCallError(NibsError),
+    PlayWaitForCardError(PlayTurnError),
     UnimplementedState,
     UnrecognizedState,
 }
@@ -98,6 +110,12 @@ pub enum NibsCheckReturn {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum PlayWaitForCardReturn {
+    AutomaticScoring(Vec<crate::score::ScoreEvent>),
+    ManualScoring,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Success {
     GameStart,
     InitialCut(InitialCutReturn),
@@ -106,4 +124,5 @@ pub enum Success {
     Discard,
     StarterCut(StarterCutReturn),
     NibsCheck(NibsCheckReturn),
+    PlayWaitForCard(PlayWaitForCardReturn),
 }
