@@ -1,4 +1,5 @@
 use crate::game_process_return;
+use crate::score;
 
 #[cfg(test)]
 mod test {
@@ -68,6 +69,7 @@ mod test {
         use super::super::play_card;
         use super::set_up_game;
         use crate::game_process_return;
+        use crate::util::return_card;
 
         #[test]
         // Return and error when the index given is not between 0 and 2 inclusive
@@ -276,6 +278,263 @@ mod test {
                 ))
             );
         }
+
+        // Test that the last_player_index of the GameImpl is set during play as it is used for
+        // scoring last card
+        #[test]
+        fn test_set_last_player_index() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            assert_eq!(game.last_player_index, None);
+            assert_eq!(game.index_active, Some(1));
+
+            game.players[1].hand = vec![return_card('T', 'H'), return_card('K', 'H')];
+            game.players[0].hand = vec![return_card('J', 'H'), return_card('2', 'H')];
+
+            // Player 1 goes first because player 0 is dealer
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+            assert_eq!(game.last_player_index, Some(1));
+            assert_eq!(game.index_active, Some(0));
+
+            // Then player 0
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+            assert_eq!(game.last_player_index, Some(0));
+            assert_eq!(game.index_active, Some(1));
+
+            // And player 1 again
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(1)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+            assert_eq!(game.last_player_index, Some(1));
+            assert_eq!(game.index_active, Some(0));
+
+            // And finally player 0 has to go
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::Go),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+            assert_eq!(game.last_player_index, Some(1));
+            assert_eq!(game.index_active, Some(1));
+
+            let mut game = set_up_game(crate::settings::RuleVariant::SixPairs, false, false, false);
+
+            assert_eq!(game.last_player_index, None);
+            assert_eq!(game.index_active, Some(1));
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+            assert_eq!(game.last_player_index, Some(1));
+            assert_eq!(game.index_active, Some(2));
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+            assert_eq!(game.last_player_index, Some(2));
+            assert_eq!(game.index_active, Some(3));
+        }
+
+        // Test that it processes score and returns correctly with automatic scoring
+        #[test]
+        fn test_auto_scoring() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            game.players[1].hand[0] = return_card('4', 'H');
+            game.players[0].hand[0] = return_card('5', 'H');
+            game.players[1].hand[1] = return_card('6', 'H');
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(1)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![
+                        crate::score::ScoreEvent {
+                            player_index: 1,
+                            point_value: 2,
+                            score_type: crate::score::ScoreType::Play(
+                                crate::score::PlayScoreType::Fifteen
+                            ),
+                        },
+                        crate::score::ScoreEvent {
+                            player_index: 1,
+                            point_value: 3,
+                            score_type: crate::score::ScoreType::Play(
+                                crate::score::PlayScoreType::Straight(3)
+                            ),
+                        },
+                    ])
+                ))
+            );
+
+            assert_eq!(game.players[1].front_peg_pos, 5);
+        }
+
+        // Test that it awards a point for last card and sets the state to ResetPlay when automatic
+        // scoring is enabled
+        #[test]
+        fn test_last_card() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            game.players[1].hand = vec![return_card('T', 'H'), return_card('K', 'H')];
+            game.players[0].hand = vec![return_card('J', 'H'), return_card('2', 'H')];
+
+            play_card(&mut game, crate::PlayTurn::CardSelected(0)).unwrap();
+            play_card(&mut game, crate::PlayTurn::CardSelected(0)).unwrap();
+            play_card(&mut game, crate::PlayTurn::CardSelected(1)).unwrap();
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::Go),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![])
+                ))
+            );
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::Go),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![
+                        crate::score::ScoreEvent {
+                            player_index: 1,
+                            point_value: 1,
+                            score_type: crate::score::ScoreType::Play(
+                                crate::score::PlayScoreType::LastCard
+                            )
+                        }
+                    ])
+                ))
+            );
+
+            assert_eq!(game.state, crate::GameState::ResetPlay);
+
+            assert_eq!(game.players[1].front_peg_pos, 1);
+        }
+
+        // Test that it awards no extra points (you get two from the scoring function already) for
+        // a value of 31 and that the state is set to ResetPlay with automatic scoring
+        #[test]
+        fn test_thirty_one() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                false,
+                false,
+                false,
+            );
+
+            game.players[1].hand = vec![return_card('T', 'H'), return_card('K', 'H')];
+            game.players[0].hand = vec![return_card('J', 'H'), return_card('A', 'H')];
+
+            play_card(&mut game, crate::PlayTurn::CardSelected(0)).unwrap();
+            play_card(&mut game, crate::PlayTurn::CardSelected(0)).unwrap();
+            play_card(&mut game, crate::PlayTurn::CardSelected(1)).unwrap();
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(1)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![
+                        crate::score::ScoreEvent {
+                            player_index: 0,
+                            point_value: 2,
+                            score_type: crate::score::ScoreType::Play(
+                                crate::score::PlayScoreType::ThirtyOne
+                            )
+                        }
+                    ])
+                ))
+            );
+
+            assert_eq!(game.state, crate::GameState::ResetPlay);
+
+            assert_eq!(game.players[0].front_peg_pos, 2);
+        }
+
+        // Test that it returns correctly and sets the state to PlayScore when manual scoring is
+        // enabled
+        #[test]
+        fn test_manual_scoring() {
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                true,
+                false,
+                false,
+            );
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::CardSelected(0)),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::ManualScoring
+                ))
+            );
+            assert_eq!(game.state, crate::GameState::PlayScore);
+
+            let mut game = set_up_game(
+                crate::settings::RuleVariant::TwoStandard,
+                true,
+                false,
+                false,
+            );
+
+            game.play_groups[0].total = 30;
+
+            assert_eq!(
+                play_card(&mut game, crate::PlayTurn::Go),
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::ManualScoring
+                ))
+            );
+            assert_eq!(game.state, crate::GameState::PlayScore);
+        }
+
+        // TODO Test how it all works after it goes through the play phase of the game more than
+        // once
     }
 
     // State that processes a ScoreEvent for when manual scoring is enabled
@@ -338,6 +597,7 @@ pub(crate) fn play_card(
         // PlayGroup total
         game.play_groups.last_mut().unwrap().cards.push(card);
         game.play_groups.last_mut().unwrap().total += crate::deck::return_play_value(card);
+        game.last_player_index = game.index_active;
 
         if game.settings.unwrap().is_manual_scoring {
             game.state = crate::GameState::PlayScore;
@@ -346,10 +606,32 @@ pub(crate) fn play_card(
                 game_process_return::PlayWaitForCardReturn::ManualScoring,
             ))
         } else {
+            let index_active = game.index_active.unwrap();
+
+            // Caluclate ScoreEvents
+            let scoring_vec =
+                score::play::play_score(index_active, game.play_groups.last().unwrap());
+
+            // Calculate total score change
+            let mut score_change = 0;
+            for score_event in &scoring_vec {
+                score_change += score_event.point_value;
+            }
+
+            // Process score change
+            crate::util::process_score(game, index_active as usize, score_change);
+
+            // Change index_active to next player
             game.index_active = Some((game.index_active.unwrap() + 1) % game.players.len() as u8);
 
+            // Change state to ResetPlay when the PlayGroup total is 31
+            if game.play_groups.last().unwrap().total == 31 {
+                game.state = crate::GameState::ResetPlay;
+            }
+
+            // Return
             Ok(game_process_return::Success::PlayWaitForCard(
-                game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![]),
+                game_process_return::PlayWaitForCardReturn::AutomaticScoring(scoring_vec),
             ))
         }
     }
@@ -361,6 +643,7 @@ pub(crate) fn play_card(
             .iter()
             .enumerate()
         {
+            // Return an error if the player can play a card, but has sent a Go
             if !has_card_been_played(game, index as u8) {
                 if game.play_groups.last().unwrap().total + crate::deck::return_play_value(*card)
                     <= 31
@@ -372,9 +655,35 @@ pub(crate) fn play_card(
             }
         }
 
-        Ok(game_process_return::Success::PlayWaitForCard(
-            game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![]),
-        ))
+        // Send game to PlayScore with manual scoring
+        if game.settings.unwrap().is_manual_scoring {
+            game.state = crate::GameState::PlayScore;
+            Ok(game_process_return::Success::PlayWaitForCard(
+                game_process_return::PlayWaitForCardReturn::ManualScoring,
+            ))
+        } else {
+            // With automatic scoring, check if everyone has gone and if the player represented by
+            // the last_player_index should receive a point
+            let last_card = game.index_active == game.last_player_index;
+            game.index_active = Some((game.index_active.unwrap() + 1) % game.players.len() as u8);
+            if last_card {
+                game.state = crate::GameState::ResetPlay;
+                crate::util::process_score(game, game.last_player_index.unwrap() as usize, 1);
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![
+                        score::ScoreEvent {
+                            player_index: game.last_player_index.unwrap(),
+                            point_value: 1,
+                            score_type: score::ScoreType::Play(score::PlayScoreType::LastCard),
+                        },
+                    ]),
+                ))
+            } else {
+                Ok(game_process_return::Success::PlayWaitForCard(
+                    game_process_return::PlayWaitForCardReturn::AutomaticScoring(vec![]),
+                ))
+            }
+        }
     }
 }
 

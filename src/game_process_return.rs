@@ -113,6 +113,7 @@ pub enum NibsCheckReturn {
 pub enum PlayWaitForCardReturn {
     AutomaticScoring(Vec<crate::score::ScoreEvent>),
     ManualScoring,
+    ToResetPlay,
 }
 
 #[derive(Debug, PartialEq)]
