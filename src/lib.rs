@@ -13,6 +13,7 @@ use state_logic::cut_starter_and_nibs_check;
 use state_logic::deal;
 use state_logic::discard;
 use state_logic::game_start;
+use state_logic::play;
 use state_logic::sort;
 
 // Enum sent to the process_turn function to advance the play of the game model
@@ -26,13 +27,12 @@ pub enum GameEvent {
     // Event containing information on the card played during the play phase (either a reference to
     // a card in the player's hand or a Go)
     Play(PlayTurn),
-    // Event containing an option of a vector of ScoreEvents for the manual scoring of a hand
-    ManScoreSelection(Option<Vec<score::ScoreEvent>>),
+    // Event containing a vector of ScoreEvents for the manual scoring of a hand
+    ManScoreSelection(Vec<score::ScoreEvent>),
     // Event for whether the dealer calls nibs
     Nibs(Option<score::ScoreEvent>),
-    // Event for contesting a player who overscores (or underscores in lowball)
-    Contest(Option<score::ScoreEvent>),
-    // Event for whether a player calls muggins
+    // Event for whether a player calls muggins, a None value means that all players are done
+    // making muggins selections and that the game is ready to move on
     Muggins(Option<Vec<score::ScoreEvent>>),
     // Simple event for continuing to the next game state; used when player input is needed such as
     // when a player must cut the deck or simply when the timing of a state change is decided by
@@ -116,17 +116,16 @@ impl Game {
                 game_process_return::Event::Nibs,
             ])),
 
-            /*
             // Takes the input from the active player and plays it
             (GameState::PlayWaitForCard, GameEvent::Play(play)) => {
-                Err(game_process_return::Error::UnimplementedState)
+                play::play_card(&mut self.game, play)
             }
             (GameState::PlayWaitForCard, _) => {
                 Err(game_process_return::Error::ExpectedEvent(vec![
                     game_process_return::Event::Play,
                 ]))
             }
-
+            /*
             // Prepares the game for the next PlayGroup or transitions state to show phase
             (GameState::ResetPlay, GameEvent::Confirmation) => {
                 Err(game_process_return::Error::UnimplementedState)
@@ -289,6 +288,10 @@ struct GameImpl {
     // The player index of who last made a valid move while playing
     pub last_player_index: Option<u8>,
 
+    // Whether the last play was a Go such as to tell if the index_active has looped around to the
+    // last_player_index
+    pub last_play_was_go: bool,
+
     pub starter_card: Option<deck::Card>,
 
     pub crib: Vec<deck::Card>,
@@ -321,6 +324,7 @@ impl GameImpl {
             index_active: None,
             index_dealer: None,
             last_player_index: None,
+            last_play_was_go: false,
             play_groups: Vec::new(),
             players: Vec::new(),
             remaining_score_events: Vec::new(),

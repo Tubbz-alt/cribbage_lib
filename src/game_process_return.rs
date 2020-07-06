@@ -78,6 +78,13 @@ pub enum PlayTurnError {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum PlayScoreError {
+    OverpeggingIsNotAllowed(crate::score::ScoreEvent),
+    // Following will only be returned when underpegging is disabled in the game's settings
+    UnderpeggingIsNotAllowed,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Error {
     ImplementationError(ImplError),
     ExpectedEvent(Vec<Event>),
@@ -86,6 +93,7 @@ pub enum Error {
     DiscardErrors(Vec<DiscardError>),
     NibsCallError(NibsError),
     PlayWaitForCardError(PlayTurnError),
+    PlayScoreError(PlayScoreError),
     UnimplementedState,
     UnrecognizedState,
 }
@@ -113,7 +121,6 @@ pub enum NibsCheckReturn {
 pub enum PlayWaitForCardReturn {
     AutomaticScoring(Vec<crate::score::ScoreEvent>),
     ManualScoring,
-    ToResetPlay,
 }
 
 #[derive(Debug, PartialEq)]
@@ -126,4 +133,5 @@ pub enum Success {
     StarterCut(StarterCutReturn),
     NibsCheck(NibsCheckReturn),
     PlayWaitForCard(PlayWaitForCardReturn),
+    PlayScore(Vec<crate::score::ScoreEvent>),
 }
